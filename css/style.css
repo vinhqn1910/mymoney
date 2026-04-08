@@ -1,0 +1,467 @@
+body{
+    margin:0;
+    font-family: Cambria, Cochin, Georgia, Times, 'Times New Roman', serif;
+    background:#f1f4f9;
+  }
+  
+  .app{
+    display:flex;
+  }
+  
+  /* SIDEBAR */
+  .sidebar{
+    width:200px;
+    min-width:200px;
+    height:100vh;
+    background:#1e293b;
+    color:white;
+    padding:20px;
+    transition:0.3s;
+  }
+  
+  .sidebar.collapsed {
+    width: 0;
+    min-width: 0;
+    padding: 0;
+    overflow: hidden;
+    background: linear-gradient(180deg,#1e293b,#0f172a); /* giữ background */
+}
+
+.main.expanded {
+    margin-left: 0; /* main chiếm toàn bộ khi sidebar collapse */
+}
+  
+  .sidebar h2{
+    margin-bottom:20px;
+  }
+  
+  .sidebar a{
+    display:block;
+    padding:10px;
+    color:#cbd5e1;
+    text-decoration:none;
+    border-radius:8px;
+    margin-bottom:5px;
+  }
+  
+  .sidebar a:hover,
+  .sidebar a.active{
+    background:#334155;
+    color:white;
+  }
+  
+  /* MAIN */
+  .main {
+    margin-left: 20px;   /* dịch content sang phải bằng width sidebar */
+    transition: margin-left 0.3s;
+    width: calc(100% - 200px); /* chiếm phần còn lại */
+}
+  
+  .main.expanded{
+    margin-left:0;
+  }
+  
+  .header{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    background:white;
+    padding:15px 20px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    box-shadow:0 2px 5px rgba(0,0,0,0.05);
+  }
+  
+  .content{
+    padding:20px;
+  }
+  
+  /* BUTTON */
+  .btn-group{
+    display:flex;
+    gap:10px;
+    margin-bottom:15px;
+  }
+  
+  .btn-group button{
+    padding:10px 15px;
+    border:none;
+    border-radius:8px;
+    background:#3b82f6;
+    color:white;
+    cursor:pointer;
+    font-family: Cambria, Cochin, Georgia, Times, 'Times New Roman', serif;
+  }
+  
+  .btn-group button:hover{
+    background:#2563eb;
+  }
+  
+  /* TABLE */
+  .table{
+    width:100%;
+    border-collapse:collapse;
+    background:white;
+    border-radius:10px;
+    overflow:hidden;
+  }
+  
+  .table th{
+    background:#3b82f6;
+    color:white;
+    padding:10px;
+  }
+  
+  .table td{
+    padding:10px;
+    border-bottom:1px solid #eee;
+  }
+  
+  .table tr:hover{
+    background:#f8fafc;
+  }
+  
+  /* BADGE */
+  .badge{
+    padding:5px 10px;
+    border-radius:20px;
+  }
+  
+  .badge-active{background:#dcfce7;color:#166534}
+  .badge-inactive{background:#fee2e2;color:#991b1b}
+  
+  /* POPUP */
+  .popup{
+    position:fixed;
+    top:0;left:0;right:0;bottom:0;
+    background:rgba(0,0,0,0.5);
+    display:flex;
+    justify-content:center;
+    align-items:center;
+  }
+  
+  .popup-content{
+    background:white;
+    padding:20px;
+    border-radius:12px;
+    width:5000px;
+  }
+  
+  .popup-content input, .popup-content select{
+    width:92%;
+    padding:10px;
+    margin:5px 0;
+    border-radius:8px;
+    border:1px solid #ccc;
+    font-family: Cambria, Cochin, Georgia, Times, 'Times New Roman', serif;
+  }
+  
+  .popup-content button{
+    width:100%;
+    margin-top:8px;
+    border:none;
+    padding:10px;
+    border-radius:8px;
+    font-family: Cambria, Cochin, Georgia, Times, 'Times New Roman', serif;
+  }
+  
+  .popup-content button:first-child{background:#22c55e;color:white}
+  .popup-content button:last-child{background:#ef4444;color:white}
+  
+  .toggle-btn{
+    font-size:20px;
+    background:none;
+    border:none;
+    cursor:pointer;
+  }
+  
+  .hidden{display:none}
+
+  .login-box{
+    width:300px;
+    font-family: Cambria, Cochin, Georgia, Times, 'Times New Roman', serif;
+    margin:100px auto;
+    background:white;
+    padding:25px;
+    border-radius:12px;
+    box-shadow:0 10px 25px rgba(0,0,0,0.1);
+    text-align:center;
+  }
+  
+  .login-box input{
+    margin:10px 0;
+    padding:10px;
+    border-radius:8px;
+    border:1px solid #ccc;
+  }
+  
+  .login-box button{
+    width:100%;
+    margin-top:10px;
+    border-radius:8px;
+  }
+  
+  .login-box button:first-of-type{
+    background:#3b82f6;
+  }
+  
+  .login-box button:last-of-type{
+    background:#22c55e;
+  }
+
+  /* USER MANAGEMENT */
+
+.form-group {
+    display:flex;
+    gap:10px;
+    margin-bottom:10px;
+  }
+  
+  .form-group input{
+    flex:1;
+  }
+  
+  .btn-save{
+    background:#22c55e;
+  }
+  
+  .btn-close{
+    background:#ef4444;
+    margin-top:10px;
+  }
+  
+  .table button{
+    margin:2px;
+  }
+
+  /* ===== GLOBAL IMPROVE ===== */
+*{
+    box-sizing:border-box;
+  }
+  
+  body{
+    background:#f8fafc;
+  }
+  
+  /* ===== SIDEBAR UPGRADE ===== */
+  .sidebar{
+    background:linear-gradient(180deg,#1e293b,#0f172a);
+    box-shadow:2px 0 10px rgba(0,0,0,0.1);
+  }
+  
+  .sidebar h2{
+    font-size:20px;
+    font-weight:bold;
+  }
+  
+  .sidebar a{
+    transition:0.2s;
+  }
+  
+  .sidebar a:hover{
+    transform:translateX(5px);
+  }
+  
+  /* ===== HEADER ===== */
+  .header{
+    border-bottom:1px solid #eee;
+  }
+  
+  .header h3{
+    margin:0;
+  }
+  
+  .header-right span{
+    font-weight:500;
+  }
+  
+  /* ===== CONTENT CARD ===== */
+  .content{
+    padding:20px;
+  }
+  
+  /* ===== BUTTON GROUP ===== */
+  .btn-group button{
+    box-shadow:0 2px 5px rgba(0,0,0,0.1);
+    transition:0.2s;
+  }
+  
+  .btn-group button:hover{
+    transform:translateY(-2px);
+  }
+  
+  /* ===== FILTER ===== */
+  .filter-bar select{
+    padding:10px;
+    border-radius:8px;
+    border:1px solid #ddd;
+    background:white;
+    font-family: Cambria, Cochin, Georgia, Times, 'Times New Roman', serif;
+  }
+  
+  /* ===== TABLE ===== */
+  .table{
+    margin-top:10px;
+    box-shadow:0 5px 15px rgba(0,0,0,0.05);
+  }
+  
+  .table th{
+    font-size:14px;
+  }
+  
+  .table td{
+    font-size:14px;
+  }
+  
+  .table tr{
+    transition:0.15s;
+  }
+  
+  .table tr:hover{
+    background:#f1f5f9;
+  }
+  
+  /* ===== TABLE BUTTON ===== */
+  .table button{
+    border:none;
+    border-radius:6px;
+    padding:5px 8px;
+    cursor:pointer;
+    font-size:12px;
+  }
+  
+  .table button:nth-child(1){background:#f59e0b;color:white} /* edit */
+  .table button:nth-child(2){background:#22c55e;color:white} /* toggle */
+  .table button:nth-child(3){background:#ef4444;color:white} /* delete */
+  
+  /* ===== BADGE ===== */
+  .badge{
+    font-size:12px;
+    font-weight:500;
+  }
+  
+  /* ===== POPUP ===== */
+  .popup{
+    backdrop-filter:blur(4px);
+  }
+  
+  .popup-content{
+    width:1000px;
+    box-shadow:0 10px 30px rgba(0,0,0,0.2);
+    animation:fadeIn 0.2s ease;
+  }
+  
+  @keyframes fadeIn{
+    from{transform:scale(0.9);opacity:0}
+    to{transform:scale(1);opacity:1}
+  }
+  
+  /* ===== INPUT ===== */
+  .popup-content input,
+  .popup-content select{
+    border:1px solid #ddd;
+    transition:0.2s;
+  }
+  
+  .popup-content input:focus,
+  .popup-content select:focus{
+    border-color:#3b82f6;
+    outline:none;
+    box-shadow:0 0 0 2px rgba(59,130,246,0.2);
+  }
+  
+  /* ===== BUTTON ===== */
+  .btn-save{
+    background:#22c55e;
+    font-weight:bold;
+  }
+  
+  .btn-save:hover{
+    background:#16a34a;
+  }
+  
+  .btn-close{
+    background:#ef4444;
+  }
+  
+  .btn-close:hover{
+    background:#dc2626;
+  }
+  
+  /* ===== LOGIN ===== */
+  .login-box{
+    animation:fadeIn 0.3s ease;
+  }
+  
+
+  #toast {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 9999;
+  }
+  
+  .toast {
+    padding: 12px 18px;
+    margin-bottom: 10px;
+    border-radius: 6px;
+    color: #fff;
+    font-size: 14px;
+    min-width: 200px;
+    animation: fadeIn 0.3s ease;
+  }
+  
+  .toast.success { background: #4caf50; }
+  .toast.error { background: #f44336; }
+  .toast.warning { background: #ff9800; }
+  
+  @keyframes fadeIn {
+    from { opacity:0; transform:translateY(-10px); }
+    to { opacity:1; transform:translateY(0); }
+  }
+
+  .popup {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .popup.hidden {
+    display: none;
+  }
+  
+  .popup-content {
+    pointer-events: all;
+  }
+
+  .table th, .table td {
+    text-align: center;
+    vertical-align: middle;
+  }
+
+  button {
+    cursor: pointer;
+    transition: 0.2s;
+  }
+  
+  button:hover {
+    opacity: 0.85;
+    transform: scale(1.05);
+  }
+
+  .loading-spinner {
+    border: 3px solid #ccc;
+    border-top: 3px solid #333;
+    border-radius: 50%;
+    width: 14px;
+    height: 14px;
+    display: inline-block;
+    animation: spin 0.8s linear infinite;
+    margin-right: 5px;
+  }
+  
+  @keyframes spin {
+    0% { transform: rotate(0deg);}
+    100% { transform: rotate(360deg);}
+  }
