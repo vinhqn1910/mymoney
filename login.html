@@ -1,15 +1,104 @@
 <!DOCTYPE html>
-<html>
+<html lang="vi">
 <head>
   <meta charset="UTF-8">
   <title>Login</title>
-  <link rel="stylesheet" href="css/style.css">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
+  <!-- Firebase -->
   <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
+
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: Cambria, Cochin, Georgia, Times, 'Times New Roman', serif;
+    }
+
+    body {
+      height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+
+      /* 👉 ĐỔI LINK ẢNH NỀN Ở ĐÂY */
+      background: url('https://images.unsplash.com/photo-1507525428034-b723cf961d3e') no-repeat center center/cover;
+    }
+
+    .overlay {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.5);
+      z-index: 1;
+    }
+
+    .login-box {
+      position: relative;
+      z-index: 2;
+      width: 320px;
+      padding: 30px;
+      border-radius: 15px;
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(10px);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+      text-align: center;
+      color: white;
+      font-family: Cambria, Cochin, Georgia, Times, 'Times New Roman', serif;
+    }
+
+    .login-box h2 {
+      margin-bottom: 20px;
+    }
+
+    .login-box input {
+      width: 100%;
+      padding: 10px;
+      margin: 10px 0;
+      border: none;
+      border-radius: 8px;
+      outline: none;
+      font-family: Cambria, Cochin, Georgia, Times, 'Times New Roman', serif;
+    }
+
+    .login-box button {
+      width: 100%;
+      padding: 10px;
+      margin-top: 10px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: bold;
+      transition: 0.3s;
+      font-family: Cambria, Cochin, Georgia, Times, 'Times New Roman', serif;
+    }
+
+    .login-btn {
+      background: #4CAF50;
+      color: white;
+    }
+
+    .login-btn:hover {
+      background: #45a049;
+    }
+
+    .register-btn {
+      background: #2196F3;
+      color: white;
+    }
+
+    .register-btn:hover {
+      background: #1976D2;
+    }
+
+  </style>
 </head>
 <body>
+
+<div class="overlay"></div>
 
 <div class="login-box">
   <h2>Đăng nhập</h2>
@@ -17,8 +106,8 @@
   <input type="email" id="email" placeholder="Email">
   <input type="password" id="password" placeholder="Mật khẩu">
 
-  <button onclick="login()">Đăng nhập</button>
-  <button onclick="register()">Đăng ký</button>
+  <button class="login-btn" onclick="login()">Đăng nhập</button>
+  <button class="register-btn" onclick="register()">Đăng ký</button>
 </div>
 
 <script src="js/firebase.js"></script>
