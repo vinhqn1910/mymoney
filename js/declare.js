@@ -169,7 +169,7 @@ async function loadUsers(){
   const snap = await db.collection("users").get();
 
   let html = `<tr>
-    <th>ID</th><th>Email</th><th>Tên</th><th>Role</th>
+    <th>User name</th><th>Email</th><th>Tên</th><th>Role</th>
     <th>Trạng thái</th><th>Lý do</th><th>Action</th>
   </tr>`;
 
@@ -178,7 +178,7 @@ async function loadUsers(){
     if(d.isDeleted) return;
 
     html += `<tr>
-      <td>${d.id}</td>
+      <td>${d.username}</td>
       <td>${d.email}</td>
       <td>${d.name || ''}</td>
       <td>${renderUserRole(d.role)}</td>
