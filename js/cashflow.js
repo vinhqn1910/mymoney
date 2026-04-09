@@ -7,6 +7,9 @@ let SOURCES = {};
 let LIMITS = {};
 let CASH = [];
 let isSaving = false;
+let currentPageIncome = 1;
+let currentPageExpense = 1;
+const pageSize = 10;
 
 // ===== UTIL =====
 function now() { return new Date(); }
@@ -54,24 +57,82 @@ function openCashPopup(type) {
   document.getElementById("popup").classList.remove("hidden");
 
   c.innerHTML = `
-    <h3>${type === "income" ? "Thu tiền" : "Chi tiền"}</h3>
+  <h3>${type === "income" ? "Thu tiền" : "Chi tiền"}</h3>
 
-    <label>Ngân hàng</label>
-    <select id="cashBank"></select>
+<label class="checkbox-inline">
+  <input type="checkbox" id="autoBankType"
+    onchange="handleAutoBank('${type}')">
+  <span>Dùng ${type === "income" ? "TK chuyên thu" : "TK chuyên trả"}</span>
+</label>
 
-    <label>Nguồn tiền</label>
-    <select id="cashSource"></select>
+  <div id="bankSuggestBox" style="display:none;margin:10px 0;"></div>
 
-    <input id="cashAmount" placeholder="Số tiền"
-      oninput="formatMoneyInput(this, ${type === "expense"})">
+  <label>Ngân hàng</label>
+  <select id="cashBank"></select>
 
-    <input id="cashNote" placeholder="Nội dung">
+  <label>Nguồn tiền</label>
+  <select id="cashSource"></select>
 
-    <button id="saveBtn" onclick="saveCash('${type}')">Lưu</button>
-    <button onclick="closePopup()">Đóng</button>
-  `;
+  <input id="cashAmount" placeholder="Số tiền"
+    oninput="formatMoneyInput(this, ${type === "expense"})">
+
+  <input id="cashNote" placeholder="Nội dung">
+
+  <div class="btn-group-center">
+    <button id="saveBtn" class="btn-save" onclick="saveCash('${type}')">Lưu</button>
+    <button class="btn-close" onclick="closePopup()">Đóng</button>
+  </div>
+`;
 
   loadOptions();
+}
+
+function handleAutoBank(type){
+
+  const checked = document.getElementById("autoBankType").checked;
+  const box = document.getElementById("bankSuggestBox");
+  const select = document.getElementById("cashBank");
+  select.disabled = checked;
+  if(!checked){
+    box.style.display = "none";
+    return;
+  }
+
+  // xác định type
+  const targetType = type === "income" ? "in" : "out";
+
+  // lọc ngân hàng phù hợp
+  const matchedBanks = Object.entries(BANKS)
+    .filter(([id,b]) => !b.isDeleted && b.type === targetType);
+
+  if(matchedBanks.length === 0){
+    showToast("Không có tài khoản phù hợp");
+    return;
+  }
+
+  // nếu chỉ 1 TK → auto chọn
+  if(matchedBanks.length === 1){
+    select.value = matchedBanks[0][0];
+    box.style.display = "none";
+    return;
+  }
+
+  // nếu nhiều → show select gợi ý
+  let html = `<label>Chọn ${type==="income"?"TK thu":"TK trả"}:</label>`;
+  html += `<select onchange="selectSuggestedBank(this)">`;
+
+  matchedBanks.forEach(([id,b])=>{
+    html += `<option value="${id}">${b.name}</option>`;
+  });
+
+  html += `</select>`;
+
+  box.innerHTML = html;
+  box.style.display = "block";
+}
+
+function selectSuggestedBank(el){
+  document.getElementById("cashBank").value = el.value;
 }
 
 function closePopup() {
@@ -325,17 +386,27 @@ function renderBalance(data) {
 }
 
 // ===== TABLE =====
-function renderTables(data) {
+function renderTables(data){
 
-  let incomeHTML = `<tr>
+  const incomeData = data.filter(d => d.type === "income");
+  const expenseData = data.filter(d => d.type === "expense");
+
+  renderTableWithPaging(incomeData, "incomeTable", "income", currentPageIncome);
+  renderTableWithPaging(expenseData, "expenseTable", "expense", currentPageExpense);
+}
+
+function renderTableWithPaging(data, tableId, type, currentPage){
+
+  const start = (currentPage - 1) * pageSize;
+  const end = start + pageSize;
+  const pageData = data.slice(start, end);
+
+  let html = `<tr>
     <th>ID</th><th>Bank</th><th>Source</th><th>Tiền</th><th>Note</th>
   </tr>`;
 
-  let expenseHTML = incomeHTML;
-
-  data.forEach(d => {
-
-    const row = `
+  pageData.forEach(d => {
+    html += `
     <tr>
       <td>${d.id}</td>
       <td>${BANKS[d.bankId]?.short || ''}</td>
@@ -343,17 +414,42 @@ function renderTables(data) {
       <td>${formatMoney(d.amount)}</td>
       <td>${d.note || ''}</td>
     </tr>`;
-
-    if (d.type === "income") incomeHTML += row;
-    else expenseHTML += row;
   });
 
-  document.getElementById("incomeTable").innerHTML = incomeHTML;
-  document.getElementById("expenseTable").innerHTML = expenseHTML;
+
+  // 👉 PAGINATION BUTTON
+  const totalPages = Math.ceil(data.length / pageSize);
+
+  let pagingHTML = `<tr><td colspan="5">`;
+
+  for(let i = 1; i <= totalPages; i++){
+    pagingHTML += `
+      <button onclick="changePage('${type}', ${i})"
+        style="margin:2px; ${i===currentPage?'font-weight:bold':''}">
+        ${i}
+      </button>
+    `;
+  }
+
+  pagingHTML += `</td></tr>`;
+
+  document.getElementById(tableId).innerHTML = html + pagingHTML;
+}
+
+function changePage(type, page){
+  if(type === "income"){
+    currentPageIncome = page;
+  }else{
+    currentPageExpense = page;
+  }
+
+  renderAll();
 }
 
 // ===== FILTER TRIGGER =====
-function loadData() {
+function loadData(){
+  currentPageIncome = 1;
+  currentPageExpense = 1;
   renderAll();
 }
 

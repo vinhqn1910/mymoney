@@ -73,9 +73,17 @@ function openPopup(type){
       <h3>Ngân hàng</h3>
       <input id="bankName" placeholder="Tên ngân hàng">
       <input id="bankShort" placeholder="Viết tắt">
+  
+      <label>Loại TK:</label>
+      <select id="bankType">
+        <option value="normal">TK bình thường</option>
+        <option value="in">TK chuyên thu</option>
+        <option value="out">TK chuyên trả</option>
+      </select>
+  
       <label>Màu:</label>
       <input type="color" id="bankColor" value="#ff0000">
-
+  
       <button type="button" class="btn-save" onclick="saveBank()">Lưu</button>
       <button type="button" class="btn-close" onclick="closePopup()">Đóng</button>
     `;
@@ -105,8 +113,165 @@ function openPopup(type){
     `;
     setTimeout(loadBankOptions,100);
   }
+
+  if(type==="user"){
+    c.innerHTML=`
+      <h3>User</h3>
+  
+      <input id="userEmailInput" placeholder="Email">
+      <input id="userNameInput" placeholder="Tên">
+  
+      <label>Role:</label>
+      <select id="userRole">
+        <option value="admin">Admin</option>
+        <option value="user">User</option>
+      </select>
+  
+      <div class="btn-group-center">
+        <button class="btn-save" onclick="saveUser()">Lưu</button>
+        <button class="btn-close" onclick="closePopup()">Đóng</button>
+      </div>
+    `;
+  }
 }
 
+async function saveUser(){
+  if(!startLoading()) return;
+
+  try{
+    const email = document.getElementById("userEmailInput").value.trim();
+    if(!email) return showToast("Nhập email","error");
+
+    const id = await getNextId("users","US");
+
+    await db.collection("users").doc(id).set(cleanData({
+      id,
+      email,
+      name: document.getElementById("userNameInput").value,
+      role: document.getElementById("userRole").value,
+      ...baseData()
+    }));
+
+    showToast("Đã thêm user");
+    closePopup();
+
+  }catch(e){
+    showToast(e.message,"error");
+  }
+
+  endLoading();
+}
+function renderUserRole(role){
+  if(role==="admin") return `<span style="color:red;font-weight:bold">Admin</span>`;
+  return `<span style="color:blue">User</span>`;
+}
+async function loadUsers(){
+  const snap = await db.collection("users").get();
+
+  let html = `<tr>
+    <th>ID</th><th>Email</th><th>Tên</th><th>Role</th>
+    <th>Trạng thái</th><th>Lý do</th><th>Action</th>
+  </tr>`;
+
+  snap.forEach(doc=>{
+    const d = doc.data();
+    if(d.isDeleted) return;
+
+    html += `<tr>
+      <td>${d.id}</td>
+      <td>${d.email}</td>
+      <td>${d.name || ''}</td>
+      <td>${renderUserRole(d.role)}</td>
+      <td>${d.status ? 'Hoạt động' : 'Ngưng'}</td>
+      <td>${d.reason || ''}</td>
+      <td>
+        <button onclick="editUser('${doc.id}')">Sửa</button>
+        <button onclick="toggleUser('${doc.id}',${d.status})">
+          ${d.status?'Ngưng':'Mở'}
+        </button>
+        <button onclick="deleteUser('${doc.id}')">Xóa</button>
+      </td>
+    </tr>`;
+  });
+
+  userTable.innerHTML = html;
+}
+
+async function editUser(id){
+  const doc = await db.collection("users").doc(id).get();
+  const d = doc.data();
+
+  const c = document.getElementById("popupContent");
+  document.getElementById("popup").classList.remove("hidden");
+
+  c.innerHTML = `
+    <h3>Sửa User</h3>
+
+    <input id="userEmailInput" value="${d.email}" placeholder="Email">
+    <input id="userNameInput" value="${d.name || ''}" placeholder="Tên">
+
+    <label>Role:</label>
+    <select id="userRole">
+      <option value="user" ${d.role==="user"?"selected":""}>User</option>
+      <option value="admin" ${d.role==="admin"?"selected":""}>Admin</option>
+    </select>
+
+    <div class="btn-group-center">
+      <button class="btn-save" onclick="updateUser('${id}')">Lưu</button>
+      <button class="btn-close" onclick="closePopup()">Đóng</button>
+    </div>
+  `;
+}
+
+async function updateUser(id){
+  if(!startLoading()) return;
+
+  try{
+    const email = document.getElementById("userEmailInput").value.trim();
+    if(!email) return showToast("Nhập email","error");
+
+    await db.collection("users").doc(id).update({
+      email,
+      name: document.getElementById("userNameInput").value,
+      role: document.getElementById("userRole").value,
+      updatedAt: now(),
+      updatedBy: getUser()
+    });
+
+    showToast("Đã cập nhật user");
+    closePopup();
+    loadUsers();
+
+  }catch(e){
+    showToast(e.message,"error");
+  }
+
+  endLoading();
+}
+
+async function toggleUser(id,status){
+  let reason="";
+  if(status) reason = prompt("Lý do:");
+
+  await db.collection("users").doc(id).update({
+    status: !status,
+    reason: status ? (reason || "") : "",
+    updatedAt: now(),
+    updatedBy: getUser()
+  });
+
+  loadUsers();
+}
+
+async function deleteUser(id){
+  await db.collection("users").doc(id).update({
+    isDeleted: true,
+    updatedAt: now(),
+    updatedBy: getUser()
+  });
+
+  loadUsers();
+}
 // ================= COUNTER =================
 async function getNextId(name,prefix){
   const ref=db.collection("counters").doc(name);
@@ -135,6 +300,7 @@ async function saveBank(){
       name,
       short:document.getElementById("bankShort").value,
       color:document.getElementById("bankColor").value,
+      type: document.getElementById("bankType").value,
       ...baseData()
     }));
 
@@ -153,7 +319,7 @@ async function loadBanks(){
   const snap=await db.collection("banks").get();
 
   let html=`<tr>
-  <th>ID</th><th>Tên</th><th>Short</th><th>Màu</th><th>Trạng thái</th><th>Lý do</th><th>Action</th></tr>`;
+  <th>ID</th><th>Tên</th><th>Short</th><th>Loại TK</th><th>Màu</th><th>Trạng thái</th><th>Lý do</th><th>Action</th></tr>`;
 
   snap.forEach(doc=>{
     const d=doc.data();
@@ -162,8 +328,9 @@ async function loadBanks(){
     html+=`<tr>
       <td>${d.id}</td>
       <td>${d.name}</td>
-      <td>${d.short||''}</td>
-      <td><div style="width:20px;height:20px;background:${d.color};margin:auto"></div></td>
+<td>${d.short||''}</td>
+<td>${renderBankType(d.type)}</td>
+<td><div style="width:20px;height:20px;background:${d.color};margin:auto"></div></td>
       <td>${d.status?'Hoạt động':'Ngưng'}</td>
       <td>${d.reason||''}</td>
       <td>
@@ -179,18 +346,65 @@ async function loadBanks(){
   bankTable.innerHTML=html;
 }
 
+function renderBankType(type){
+  if(type==="in") return "TK chuyên thu";
+  if(type==="out") return "TK chuyên trả";
+  return "TK bình thường";
+}
+
 async function editBank(id){
-  const name=prompt("Tên mới:");
-  if(!name) return;
+  const doc = await db.collection("banks").doc(id).get();
+  const d = doc.data();
 
-  await db.collection("banks").doc(id).update({
-    name,
-    updatedAt:now(),
-    updatedBy:getUser()
-  });
+  const c = document.getElementById("popupContent");
+  document.getElementById("popup").classList.remove("hidden");
 
-  showToast("Đã sửa");
-  loadBanks();
+  c.innerHTML = `
+    <h3>Sửa ngân hàng</h3>
+
+    <input id="bankName" value="${d.name || ''}" placeholder="Tên ngân hàng">
+    <input id="bankShort" value="${d.short || ''}" placeholder="Viết tắt">
+
+    <label>Loại TK:</label>
+    <select id="bankType">
+      <option value="normal" ${(!d.type || d.type==="normal")?"selected":""}>TK bình thường</option>
+      <option value="in" ${d.type==="in"?"selected":""}>TK chuyên thu</option>
+      <option value="out" ${d.type==="out"?"selected":""}>TK chuyên trả</option>
+    </select>
+
+    <label>Màu:</label>
+    <input type="color" id="bankColor" value="${d.color || '#ff0000'}">
+
+    <button type="button" class="btn-save" onclick="updateBank('${id}')">Lưu</button>
+    <button type="button" class="btn-close" onclick="closePopup()">Đóng</button>
+  `;
+}
+
+async function updateBank(id){
+  if(!startLoading()) return;
+
+  try{
+    const name = document.getElementById("bankName").value.trim();
+    if(!name) return showToast("Nhập tên ngân hàng","error");
+
+    await db.collection("banks").doc(id).update({
+      name,
+      short: document.getElementById("bankShort").value,
+      type: document.getElementById("bankType").value,
+      color: document.getElementById("bankColor").value,
+      updatedAt: now(),
+      updatedBy: getUser()
+    });
+
+    showToast("Đã cập nhật ngân hàng");
+    closePopup();
+    loadBanks();
+
+  }catch(e){
+    showToast(e.message,"error");
+  }
+
+  endLoading();
 }
 
 async function toggleBank(id,status){
@@ -410,3 +624,4 @@ function loadBankOptions(){
 loadBanks();
 loadSources();
 loadLimits();
+loadUsers();
