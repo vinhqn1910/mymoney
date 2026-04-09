@@ -178,7 +178,7 @@ async function loadUsers(){
     if(d.isDeleted) return;
 
     html += `<tr>
-      <td>${d.username}</td>
+      <td>${d.username || d.id}</td>
       <td>${d.email}</td>
       <td>${d.name || ''}</td>
       <td>${renderUserRole(d.role)}</td>
