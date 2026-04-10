@@ -138,11 +138,19 @@
       document.querySelector('.main').classList.toggle('expanded');
     }
 
-    firebase.auth().onAuthStateChanged(user => {
-      if (user) {
-        document.getElementById("userEmail").innerText = "👤 " + user.email;
-      }
+    firebase.auth().onAuthStateChanged(async (user) => {
+  if (user) {
+    const db = firebase.firestore();
+
+    const querySnapshot = await db.collection("users")
+      .where("email", "==", user.email)
+      .get();
+
+    querySnapshot.forEach((doc) => {
+      document.getElementById("userEmail").innerText = "👤 " + doc.data().name;
     });
+  }
+});
 
     // ===== LOAD =====
     async function loadStatic() {
