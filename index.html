@@ -23,8 +23,8 @@
 
     /* 🔥 CHART DÀI NGANG + ỐM */
     .chart-box.full {
-      height: 220px; /* 👈 giảm chiều cao */
-      width: 100%;
+      height: 270px; /* 👈 giảm chiều cao */
+      width: 70%;
       padding: 10px 20px;
     }
 
@@ -41,8 +41,17 @@
 
     .chart-box canvas {
       width: 100% !important;
-      height: 140px !important;
+      height: 220px !important;
     }
+    .row {
+  display: grid;
+  grid-template-columns: 250px 1fr; /* 👈 debit nhỏ - credit lớn */
+  gap: 20px;
+}
+
+.chart-box.debit {
+  height: 220px;
+}
   </style>
 </head>
 
@@ -67,11 +76,22 @@
       <h2>📊 Dashboard tài chính</h2>
 
       <div class="grid">
+  
+        <!-- HÀNG 1 -->
         <div class="chart-box full">
           <canvas id="bankChart"></canvas>
         </div>
-
-        <div id="creditContainer" class="grid small"></div>
+      
+        <!-- HÀNG 2 -->
+        <div class="row">
+          <div class="chart-box debit">
+            <div class="chart-title">Tiền ghi nợ</div>
+            <canvas id="debitChart"></canvas>
+          </div>
+      
+          <div id="creditContainer" class="grid small"></div>
+        </div>
+      
       </div>
     </div>
   </div>
@@ -157,6 +177,7 @@ function renderCharts(){
 
   renderBankChart();
   renderCreditChart();
+  renderDebitChart(); 
 }
 
 // ===== BAR CHART =====
@@ -165,18 +186,18 @@ function renderBankChart(){
   let map = {};
 
   CASH.forEach(d => {
-    const s = SOURCES[d.sourceId]?.short;
+    const s = SOURCES[d.sourceId]?.name;
 
     if(!map[d.bankId]) map[d.bankId] = {GN:0, TD:0};
 
-    if(s==="GN") map[d.bankId].GN += Number(d.amount);
-    if(s==="TD") map[d.bankId].TD += Number(d.amount);
+    if(s==="Ghi nợ") map[d.bankId].GN += Number(d.amount);
+    if(s==="Tín dụng") map[d.bankId].TD += Number(d.amount);
   });
 
   let labels=[], gn=[], td=[];
 
   Object.keys(map).forEach(id=>{
-    labels.push(BANKS[id]?.short || id);
+    labels.push(BANKS[id]?.name || id);
     gn.push(map[id].GN);
     td.push(map[id].TD);
   });
@@ -234,6 +255,77 @@ function renderBankChart(){
 });
 }
 
+function renderDebitChart(){
+
+let map = {};
+
+// 👇 gom tiền GN theo từng bank
+CASH.forEach(d=>{
+  if(SOURCES[d.sourceId]?.short === "GN"){
+
+    if(!map[d.bankId]) map[d.bankId] = 0;
+
+    map[d.bankId] += Number(d.amount);
+  }
+});
+
+const labels = [];
+const data = [];
+const colors = []; 
+Object.keys(map).forEach(bankId=>{
+  const value = Math.abs(map[bankId]);
+
+  if(value === 0) return;
+
+  labels.push(BANKS[bankId]?.name || bankId);
+  data.push(value);
+
+  // 👇 LẤY MÀU TỪ FIRESTORE
+  colors.push(BANKS[bankId]?.color || "#ccc");
+});
+
+const canvas = document.getElementById("debitChart");
+
+if(window.debitChart && typeof window.debitChart.destroy==="function"){
+  window.debitChart.destroy();
+}
+
+window.debitChart = new Chart(canvas,{
+  type:'doughnut',
+  data:{
+    labels,
+    datasets:[{
+  data,
+  backgroundColor: colors // 👈 DÙNG MÀU BANK
+}]
+  },
+  options:{
+    plugins:{
+      legend:{
+        display:false
+      }
+    }
+  },
+  plugins:[{
+    id:'centerText',
+    afterDraw(chart){
+      const {ctx, chartArea:{width, height}} = chart;
+
+      const total = data.reduce((a,b)=>a+b,0);
+
+      ctx.save();
+      ctx.textAlign = "center";
+
+      ctx.font = "bold 14px 'cambria'";
+      ctx.fillText(total.toLocaleString(), width/2, height/2);
+
+      ctx.restore();
+    }
+  }]
+});
+
+}
+
 // ===== CREDIT CHART =====
 function renderCreditChart(){
 
@@ -246,7 +338,7 @@ function renderCreditChart(){
     let used = 0;
 
     CASH.forEach(d=>{
-      if(d.bankId===bankId && SOURCES[d.sourceId]?.short==="TD"){
+      if(d.bankId===bankId && SOURCES[d.sourceId]?.name==="Tín dụng"){
         used += Number(d.amount);
       }
     });
@@ -259,7 +351,7 @@ function renderCreditChart(){
     box.className = "chart-box";
 
     const title = document.createElement("div");
-    title.innerText = BANKS[bankId]?.short || bankId;
+    title.innerText = BANKS[bankId]?.name || bankId;
     title.style.fontWeight = "bold";
 
     const canvas = document.createElement("canvas");
