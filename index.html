@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html>
+
 <head>
   <meta charset="UTF-8">
   <title>Dashboard</title>
@@ -23,7 +24,8 @@
 
     /* 🔥 CHART DÀI NGANG + ỐM */
     .chart-box.full {
-      height: 270px; /* 👈 giảm chiều cao */
+      height: 270px;
+      /* 👈 giảm chiều cao */
       width: 70%;
       padding: 10px 20px;
     }
@@ -37,362 +39,390 @@
       border-radius: 12px;
       padding: 10px;
       text-align: center;
+
+      display: flex;
+      flex-direction: column;
+      align-items: center;
     }
 
-    .chart-box canvas {
+    /* ===== BANK CHART (BAR) ===== */
+    .chart-box.full canvas {
       width: 100% !important;
-      height: 220px !important;
+      height: 100% !important;
     }
-    .row {
-  display: grid;
-  grid-template-columns: 250px 1fr; /* 👈 debit nhỏ - credit lớn */
-  gap: 20px;
-}
 
-.chart-box.debit {
-  height: 220px;
+    /* ===== DOUGHNUT CHART (DEBIT + CREDIT) ===== */
+    .chart-box.debit canvas,
+    #creditContainer canvas {
+      width: 180px !important;
+      height: 180px !important;
+      display: block;
+      margin: auto;
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: 250px 1fr;
+      /* 👈 debit nhỏ - credit lớn */
+      gap: 20px;
+    }
+
+    .chart-box.debit {
+      height: 285px;
+    }
+    .chart-title {
+  font-weight: 700;
+  font-size: 14px;
 }
   </style>
 </head>
 
 <body>
 
-<div class="app">
-  <div id="sidebar" class="sidebar"></div>
+  <div class="app">
+    <div id="sidebar" class="sidebar"></div>
 
-  <div class="main">
-    <div class="header">
-      <div class="header-left">
-        <button onclick="toggleSidebar()" class="toggle-btn">☰</button>
-        <h3>Dashboard</h3>
-      </div>
-
-      <div class="header-right">
-        <span id="userEmail">👤</span>
-      </div>
-    </div>
-
-    <div class="content">
-      <h2>📊 Dashboard tài chính</h2>
-
-      <div class="grid">
-  
-        <!-- HÀNG 1 -->
-        <div class="chart-box full">
-          <canvas id="bankChart"></canvas>
+    <div class="main">
+      <div class="header">
+        <div class="header-left">
+          <button onclick="toggleSidebar()" class="toggle-btn">☰</button>
+          <h3>Dashboard</h3>
         </div>
-      
-        <!-- HÀNG 2 -->
-        <div class="row">
-          <div class="chart-box debit">
-            <div class="chart-title">Tiền ghi nợ</div>
-            <canvas id="debitChart"></canvas>
+
+        <div class="header-right">
+          <span id="userEmail">👤</span>
+        </div>
+      </div>
+
+      <div class="content">
+        <h2>📊 Dashboard tài chính</h2>
+
+        <div class="grid">
+
+          <!-- HÀNG 1 -->
+          <div class="chart-box full">
+            <canvas id="bankChart"></canvas>
           </div>
-      
-          <div id="creditContainer" class="grid small"></div>
+
+          <!-- HÀNG 2 -->
+          <div class="row">
+            <div class="chart-box debit">
+              <div class="chart-title">Tiền ghi nợ</div>
+              <canvas id="debitChart"></canvas>
+            </div>
+
+            <div id="creditContainer" class="grid small"></div>
+          </div>
+
         </div>
-      
       </div>
     </div>
   </div>
-</div>
 
-<script src="js/firebase.js"></script>
-<script src="js/auth.js"></script>
-<script src="js/loadMenu.js"></script>
+  <script src="js/firebase.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/loadMenu.js"></script>
 
-<script>
-window.db = window.db || firebase.firestore();
+  <script>
+    window.db = window.db || firebase.firestore();
 
-let BANKS = {};
-let SOURCES = {};
-let LIMITS = {};
-let CASH = [];
+    let BANKS = {};
+    let SOURCES = {};
+    let LIMITS = {};
+    let CASH = [];
 
-// ===== UI =====
-function toggleSidebar(){
-  document.querySelector('.sidebar').classList.toggle('collapsed');
-  document.querySelector('.main').classList.toggle('expanded');
-}
+    // ===== UI =====
+    function toggleSidebar() {
+      document.querySelector('.sidebar').classList.toggle('collapsed');
+      document.querySelector('.main').classList.toggle('expanded');
+    }
 
-firebase.auth().onAuthStateChanged(user=>{
-  if(user){
-    document.getElementById("userEmail").innerText = "👤 " + user.email;
-  }
-});
-
-// ===== LOAD =====
-async function loadStatic(){
-  const [banks, sources, limits] = await Promise.all([
-    window.db.collection("banks").get(),
-    window.db.collection("sources").get(),
-    window.db.collection("limits").get()
-  ]);
-
-  banks.forEach(d => BANKS[d.id] = d.data());
-  sources.forEach(d => SOURCES[d.id] = d.data());
-  limits.forEach(d => {
-    LIMITS[d.data().bankId] = Number(d.data().value);
-  });
-}
-
-// ===== REALTIME =====
-function listenCash(){
-  window.db.collection("cashflow")
-    .orderBy("createdAt","desc")
-    .onSnapshot(snap => {
-      CASH = [];
-      snap.forEach(d => CASH.push(d.data()));
-      renderCharts();
-    });
-}
-
-// ===== TEXT GIỮA CHART =====
-const centerTextPlugin = {
-  id: 'centerText',
-  afterDraw(chart) {
-    const {ctx, chartArea:{width, height}} = chart;
-    const data = chart.data.datasets[0].data;
-
-    const used = data[0];
-    const remain = data[1];
-
-    ctx.save();
-    ctx.textAlign = "center";
-
-    ctx.font = "bold 12px Arial";
-    ctx.fillText(used.toLocaleString(), width/2, height/2 - 6);
-
-    ctx.font = "11px Arial";
-    ctx.fillText("Còn: " + remain.toLocaleString(), width/2, height/2 + 10);
-
-    ctx.restore();
-  }
-};
-
-// ===== CHARTS =====
-function renderCharts(){
-  if(!Object.keys(BANKS).length) return;
-  if(!Object.keys(SOURCES).length) return;
-
-  renderBankChart();
-  renderCreditChart();
-  renderDebitChart(); 
-}
-
-// ===== BAR CHART =====
-function renderBankChart(){
-
-  let map = {};
-
-  CASH.forEach(d => {
-    const s = SOURCES[d.sourceId]?.name;
-
-    if(!map[d.bankId]) map[d.bankId] = {GN:0, TD:0};
-
-    if(s==="Ghi nợ") map[d.bankId].GN += Number(d.amount);
-    if(s==="Tín dụng") map[d.bankId].TD += Number(d.amount);
-  });
-
-  let labels=[], gn=[], td=[];
-
-  Object.keys(map).forEach(id=>{
-    labels.push(BANKS[id]?.name || id);
-    gn.push(map[id].GN);
-    td.push(map[id].TD);
-  });
-
-  if(window.bankChart && typeof window.bankChart.destroy==="function"){
-    window.bankChart.destroy();
-  }
-
-  const canvas = document.getElementById("bankChart");
-
-  window.bankChart = new Chart(canvas,{
-  type:'bar',
-  data:{
-    labels,
-    datasets:[
-      {
-        label:'Ghi nợ',
-        data:gn,
-        backgroundColor:"#1890ff",
-
-        // 👇 CHỈNH ĐỘ MỎNG CỘT
-        barThickness: 15,
-
-        // 👇 BO GÓC (đẹp hơn)
-        borderRadius: 6
-      },
-      {
-        label:'Tín dụng',
-        data:td,
-        backgroundColor:"#ff4d4f",
-
-        barThickness: 15,
-        borderRadius: 6
+    firebase.auth().onAuthStateChanged(user => {
+      if (user) {
+        document.getElementById("userEmail").innerText = "👤 " + user.email;
       }
-    ]
-  },
-  options:{
-    responsive:true,
-    maintainAspectRatio:false,
-    scales:{
-      x:{ stacked:true },
-      y:{
-        stacked:true,
-        ticks:{
-          callback: v => v.toLocaleString()
+    });
+
+    // ===== LOAD =====
+    async function loadStatic() {
+      const [banks, sources, limits] = await Promise.all([
+        window.db.collection("banks").get(),
+        window.db.collection("sources").get(),
+        window.db.collection("limits").get()
+      ]);
+
+      banks.forEach(d => BANKS[d.id] = d.data());
+      sources.forEach(d => SOURCES[d.id] = d.data());
+      limits.forEach(d => {
+        LIMITS[d.data().bankId] = Number(d.data().value);
+      });
+    }
+
+    // ===== REALTIME =====
+    function listenCash() {
+      window.db.collection("cashflow")
+        .orderBy("createdAt", "desc")
+        .onSnapshot(snap => {
+          CASH = [];
+          snap.forEach(d => CASH.push(d.data()));
+          renderCharts();
+        });
+    }
+
+    // ===== TEXT GIỮA CHART =====
+    const centerTextPlugin = {
+      id: 'centerText',
+      afterDraw(chart) {
+        const { ctx, chartArea: { width, height } } = chart;
+        const data = chart.data.datasets[0].data;
+
+        const used = data[0];
+        const remain = data[1];
+
+        ctx.save();
+        ctx.textAlign = "center";
+
+        ctx.font = "bold 12px Arial";
+        ctx.fillText(used.toLocaleString(), width / 2, height / 2 - 6);
+
+        ctx.font = "11px Arial";
+        ctx.fillText("Còn: " + remain.toLocaleString(), width / 2, height / 2 + 10);
+
+        ctx.restore();
+      }
+    };
+
+    // ===== CHARTS =====
+    function renderCharts() {
+      if (!Object.keys(BANKS).length) return;
+      if (!Object.keys(SOURCES).length) return;
+
+      renderBankChart();
+      renderCreditChart();
+      renderDebitChart();
+    }
+
+    // ===== BAR CHART =====
+    function renderBankChart() {
+
+      let map = {};
+
+      CASH.forEach(d => {
+        const s = SOURCES[d.sourceId]?.name;
+
+        if (!map[d.bankId]) map[d.bankId] = { GN: 0, TD: 0 };
+
+        if (s === "Ghi nợ") map[d.bankId].GN += Number(d.amount);
+        if (s === "Tín dụng") map[d.bankId].TD += Number(d.amount);
+      });
+
+      let labels = [], gn = [], td = [];
+
+      Object.keys(map).forEach(id => {
+        labels.push(BANKS[id]?.name || id);
+        gn.push(map[id].GN);
+        td.push(map[id].TD);
+      });
+
+      if (window.bankChart && typeof window.bankChart.destroy === "function") {
+        window.bankChart.destroy();
+      }
+
+      const canvas = document.getElementById("bankChart");
+
+      window.bankChart = new Chart(canvas, {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [
+            {
+              label: 'Ghi nợ',
+              data: gn,
+              backgroundColor: "#1890ff",
+
+              // 👇 CHỈNH ĐỘ MỎNG CỘT
+              barThickness: 15,
+
+              // 👇 BO GÓC (đẹp hơn)
+              borderRadius: 6
+            },
+            {
+              label: 'Tín dụng',
+              data: td,
+              backgroundColor: "#ff4d4f",
+
+              barThickness: 15,
+              borderRadius: 6
+            }
+          ]
         },
-        suggestedMin:-500000,
-        suggestedMax:500000
-      }
-    },
-    plugins:{
-      legend:{ position:'top' }
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            x: { stacked: true },
+            y: {
+              stacked: true,
+              ticks: {
+                callback: v => v.toLocaleString()
+              },
+              suggestedMin: -500000,
+              suggestedMax: 500000
+            }
+          },
+          plugins: {
+            legend: { position: 'top' }
+          }
+        }
+      });
     }
-  }
-});
-}
 
-function renderDebitChart(){
+    function renderDebitChart() {
 
-let map = {};
+      let map = {};
 
-// 👇 gom tiền GN theo từng bank
-CASH.forEach(d=>{
-  if(SOURCES[d.sourceId]?.short === "GN"){
+      // 👇 gom tiền GN theo từng bank
+      CASH.forEach(d => {
+        if (SOURCES[d.sourceId]?.short === "GN") {
 
-    if(!map[d.bankId]) map[d.bankId] = 0;
+          if (!map[d.bankId]) map[d.bankId] = 0;
 
-    map[d.bankId] += Number(d.amount);
-  }
-});
+          map[d.bankId] += Number(d.amount);
+        }
+      });
 
-const labels = [];
-const data = [];
-const colors = []; 
-Object.keys(map).forEach(bankId=>{
-  const value = Math.abs(map[bankId]);
+      const labels = [];
+      const data = [];
+      const colors = [];
+      Object.keys(map).forEach(bankId => {
+        const value = Math.abs(map[bankId]);
 
-  if(value === 0) return;
+        if (value === 0) return;
 
-  labels.push(BANKS[bankId]?.name || bankId);
-  data.push(value);
+        labels.push(BANKS[bankId]?.name || bankId);
+        data.push(value);
 
-  // 👇 LẤY MÀU TỪ FIRESTORE
-  colors.push(BANKS[bankId]?.color || "#ccc");
-});
+        // 👇 LẤY MÀU TỪ FIRESTORE
+        colors.push(BANKS[bankId]?.color || "#ccc");
+      });
 
-const canvas = document.getElementById("debitChart");
+      const canvas = document.getElementById("debitChart");
 
-if(window.debitChart && typeof window.debitChart.destroy==="function"){
-  window.debitChart.destroy();
-}
-
-window.debitChart = new Chart(canvas,{
-  type:'doughnut',
-  data:{
-    labels,
-    datasets:[{
-  data,
-  backgroundColor: colors // 👈 DÙNG MÀU BANK
-}]
-  },
-  options:{
-    plugins:{
-      legend:{
-        display:false
+      if (window.debitChart && typeof window.debitChart.destroy === "function") {
+        window.debitChart.destroy();
       }
+
+      window.debitChart = new Chart(canvas, {
+        type: 'doughnut',
+        data: {
+          labels,
+          datasets: [{
+            data,
+            backgroundColor: colors // 👈 DÙNG MÀU BANK
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: true,
+          aspectRatio: 1,
+          plugins: {
+            legend: {
+              display: false
+            }
+          }
+        },
+        plugins: [{
+          id: 'centerText',
+          afterDraw(chart) {
+            const { ctx, chartArea: { width, height } } = chart;
+
+            const total = data.reduce((a, b) => a + b, 0);
+
+            ctx.save();
+            ctx.textAlign = "center";
+
+            ctx.font = "bold 14px 'cambria'";
+            ctx.fillText(total.toLocaleString(), width / 2, height / 2);
+
+            ctx.restore();
+          }
+        }]
+      });
+
     }
-  },
-  plugins:[{
-    id:'centerText',
-    afterDraw(chart){
-      const {ctx, chartArea:{width, height}} = chart;
 
-      const total = data.reduce((a,b)=>a+b,0);
+    // ===== CREDIT CHART =====
+    function renderCreditChart() {
 
-      ctx.save();
-      ctx.textAlign = "center";
+      const container = document.getElementById("creditContainer");
+      container.innerHTML = "";
 
-      ctx.font = "bold 14px 'cambria'";
-      ctx.fillText(total.toLocaleString(), width/2, height/2);
+      Object.keys(LIMITS).forEach(bankId => {
 
-      ctx.restore();
-    }
-  }]
-});
+        const limit = LIMITS[bankId];
+        let used = 0;
 
-}
+        CASH.forEach(d => {
+          if (d.bankId === bankId && SOURCES[d.sourceId]?.name === "Tín dụng") {
+            used += Number(d.amount);
+          }
+        });
 
-// ===== CREDIT CHART =====
-function renderCreditChart(){
+        if (used === 0 && limit === 0) return;
 
-  const container = document.getElementById("creditContainer");
-  container.innerHTML = "";
+        const remain = limit + used;
 
-  Object.keys(LIMITS).forEach(bankId => {
+        const box = document.createElement("div");
+        box.className = "chart-box";
 
-    const limit = LIMITS[bankId];
-    let used = 0;
+        const title = document.createElement("div");
+        title.innerText = BANKS[bankId]?.name || bankId;
+        title.style.fontWeight = "bold";
 
-    CASH.forEach(d=>{
-      if(d.bankId===bankId && SOURCES[d.sourceId]?.name==="Tín dụng"){
-        used += Number(d.amount);
-      }
-    });
+        const canvas = document.createElement("canvas");
 
-    if(used===0 && limit===0) return;
-
-    const remain = limit + used;
-
-    const box = document.createElement("div");
-    box.className = "chart-box";
-
-    const title = document.createElement("div");
-    title.innerText = BANKS[bankId]?.name || bankId;
-    title.style.fontWeight = "bold";
-
-    const canvas = document.createElement("canvas");
-
-    const info = document.createElement("div");
-    info.style.fontSize = "12px";
-    info.innerHTML = `
+        const info = document.createElement("div");
+        info.style.fontSize = "12px";
+        info.innerHTML = `
       <div>Used: ${Math.abs(used).toLocaleString()}</div>
       <div>Remain: ${remain.toLocaleString()}</div>
     `;
 
-    box.appendChild(title);
-    box.appendChild(canvas);
-    box.appendChild(info);
+        box.appendChild(title);
+        box.appendChild(canvas);
+        box.appendChild(info);
 
-    container.appendChild(box);
+        container.appendChild(box);
 
-    new Chart(canvas,{
-      type:'doughnut',
-      data:{
-        datasets:[{
-          data:[Math.abs(used), remain],
-          backgroundColor:["#ff4d4f","#52c41a"]
-        }]
-      },
-      options:{
-        plugins:{legend:{display:false}}
-      },
-      plugins:[centerTextPlugin]
-    });
+        new Chart(canvas, {
+          type: 'doughnut',
+          data: {
+            datasets: [{
+              data: [Math.abs(used), remain],
+              backgroundColor: ["#ff4d4f", "#52c41a"]
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            aspectRatio: 1,
+            plugins: {
+              legend: { display: false }
+            }
+          },
+          plugins: [centerTextPlugin]
+        });
+      });
+    }
 
-  });
-}
-
-// ===== INIT =====
-async function init(){
-  await loadStatic();
-  listenCash();
-}
-init();
-</script>
+    // ===== INIT =====
+    async function init() {
+      await loadStatic();
+      listenCash();
+    }
+    init();
+  </script>
 
 </body>
+
 </html>
