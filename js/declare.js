@@ -92,8 +92,8 @@ function openPopup(type){
   if(type==="source"){
     c.innerHTML=`
       <h3>Nguồn tiền</h3>
-      <input id="sourceName" placeholder="Tên">
-      <input id="sourceShort" placeholder="Viết tắt">
+      <input id="sourceName" placeholder="Viết tắt">
+      <input id="sourceShort" placeholder="Tên Ngân hàng">
       <label>Màu:</label>
       <input type="color" id="sourceColor">
 
