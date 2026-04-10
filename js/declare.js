@@ -578,7 +578,7 @@ async function loadLimits(){
 
     html+=`<tr>
       <td>${d.id}</td>
-      <td>${bankMap[d.bankId]?.short||d.bankId}</td>
+      <td>${bankMap[d.bankId]?.name||d.bankId}</td>
       <td>${formatMoneyDisplay(d.value)}</td>
       <td>${d.status?'Hoạt động':'Ngưng'}</td>
       <td>${d.reason||''}</td>
