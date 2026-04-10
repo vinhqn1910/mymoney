@@ -87,13 +87,13 @@ function openCashPopup(type) {
   loadOptions();
 }
 
-function handleAutoBank(type){
+function handleAutoBank(type) {
 
   const checked = document.getElementById("autoBankType").checked;
   const box = document.getElementById("bankSuggestBox");
   const select = document.getElementById("cashBank");
   select.disabled = checked;
-  if(!checked){
+  if (!checked) {
     box.style.display = "none";
     return;
   }
@@ -103,35 +103,39 @@ function handleAutoBank(type){
 
   // lọc ngân hàng phù hợp
   const matchedBanks = Object.entries(BANKS)
-    .filter(([id,b]) => !b.isDeleted && b.type === targetType);
+    .filter(([id, b]) => !b.isDeleted && b.type === targetType);
 
-  if(matchedBanks.length === 0){
+  if (matchedBanks.length === 0) {
     showToast("Không có tài khoản phù hợp");
     return;
   }
 
   // nếu chỉ 1 TK → auto chọn
-  if(matchedBanks.length === 1){
+  if (matchedBanks.length === 1) {
     select.value = matchedBanks[0][0];
     box.style.display = "none";
     return;
   }
 
   // nếu nhiều → show select gợi ý
-  let html = `<label>Chọn ${type==="income"?"TK thu":"TK trả"}:</label>`;
+  let html = `<label>Chọn ${type === "income" ? "TK thu" : "TK trả"}:</label>`;
   html += `<select onchange="selectSuggestedBank(this)">`;
 
-  matchedBanks.forEach(([id,b])=>{
-    html += `<option value="${id}">${b.name}</option>`;
+  matchedBanks.forEach(([id, b], index) => {
+    html += `<option value="${id}" ${index === 0 ? 'selected' : ''}>${b.name}</option>`;
   });
 
   html += `</select>`;
 
   box.innerHTML = html;
   box.style.display = "block";
+
+
+  // ✅ FIX: set mặc định theo bank đầu tiên đúng loại
+  select.value = matchedBanks[0][0];
 }
 
-function selectSuggestedBank(el){
+function selectSuggestedBank(el) {
   document.getElementById("cashBank").value = el.value;
 }
 
@@ -144,8 +148,20 @@ function loadOptions() {
   let bankHTML = "", sourceHTML = "";
 
   Object.keys(BANKS).forEach(id => {
-    if (!BANKS[id].isDeleted) {
-      bankHTML += `<option value="${id}">${BANKS[id].name}</option>`;
+    const b = BANKS[id];
+
+    if (!b.isDeleted) {
+
+      const isDisabled = b.status === false;
+
+      bankHTML += `
+        <option value="${id}" 
+          ${isDisabled ? "disabled" : ""}
+          title="${isDisabled ? "Ngân hàng đang ngưng hoạt động, kiểm tra lại khai báo" : ""}"
+          style="${isDisabled ? "color:#999;" : ""}">
+          ${b.name}
+        </option>
+      `;
     }
   });
 
@@ -165,8 +181,31 @@ async function saveCash(type) {
   if (isSaving) return;
 
   const btn = document.getElementById("saveBtn");
+
   const amount = getRawMoney("cashAmount");
   if (!amount) return showToast("Nhập tiền");
+
+  // ===== LẤY DATA =====
+  const bankId = document.getElementById("cashBank").value;
+  const sourceId = document.getElementById("cashSource").value;
+  const note = document.getElementById("cashNote").value;
+
+  const bank = BANKS[bankId];
+  const source = SOURCES[sourceId]?.short;
+
+  // ===== CHECK BANK =====
+  if (!bank || bank.status === false) {
+    return showToast("Ngân hàng đang ngưng hoạt động!");
+  }
+
+  // ===== CHECK LIMIT (CHỈ TÍN DỤNG) =====
+  if (source === "TD") {
+    const limit = LIMITS[bankId];
+
+    if (!limit || limit.status === false) {
+      return showToast("Hạn mức tín dụng đang ngưng!");
+    }
+  }
 
   try {
     isSaving = true;
@@ -174,24 +213,26 @@ async function saveCash(type) {
     btn.innerHTML = `<span class="loading-spinner"></span>Đang lưu`;
     btn.disabled = true;
 
-    // OPTIMISTIC UI
+    // ===== OPTIMISTIC UI =====
     const tempData = {
       id: "temp-" + Date.now(),
       type,
-      bankId: cashBank.value,
-      sourceId: cashSource.value,
+      bankId,
+      sourceId,
       amount: Number(amount),
-      note: cashNote.value
+      note
     };
 
     CASH.unshift(tempData);
     renderAll();
 
+    // ===== GENERATE ID =====
     const id = await getNextId(
       type === "income" ? "income" : "expense",
       type === "income" ? "TT" : "CT"
     );
 
+    // ===== SAVE FIRESTORE =====
     await db.collection("cashflow").doc(id).set({
       ...tempData,
       id,
@@ -221,7 +262,7 @@ async function loadBanks() {
   snap.forEach(d => {
     const data = d.data();
     BANKS[d.id] = data;
-    html += `<option value="${d.id}">${data.short}</option>`;
+    html += `<option value="${d.id}">${data.name}</option>`;
   });
 
   document.getElementById("filterBank").innerHTML = html;
@@ -250,7 +291,8 @@ async function loadLimits() {
     const data = d.data();
     LIMITS[data.bankId] = {
       limit: Number(data.value),
-      used: 0
+      used: 0,
+      status: data.status !== false // mặc định true nếu không có
     };
   });
 }
@@ -307,7 +349,7 @@ function renderBalance(data) {
     <th>Đã dùng</th>
     <th>Còn lại</th>
   </tr>`;
-
+  let grandTotal = 0;
   let bankMap = {};
 
   data.forEach(d => {
@@ -326,14 +368,14 @@ function renderBalance(data) {
   const bankFilter = document.getElementById("filterBank")?.value || "all";
 
   let allBankIds;
-  
-  if(bankFilter === "all"){
+
+  if (bankFilter === "all") {
     allBankIds = new Set([
       ...Object.keys(BANKS),
       ...Object.keys(LIMITS),
       ...Object.keys(bankMap)
     ]);
-  }else{
+  } else {
     allBankIds = new Set([bankFilter]);
   }
 
@@ -345,6 +387,9 @@ function renderBalance(data) {
 
     // GHI NỢ
     if (debit !== 0) {
+
+      grandTotal += debit; // ✅ cộng vào tổng
+
       html += `
       <tr>
         <td>${bank?.name || ''}</td>
@@ -367,26 +412,35 @@ function renderBalance(data) {
         }
       });
 
-      // 👉 chỉ render nếu có phát sinh
       if (used !== 0) {
+
+        const remain = credit.limit + used;
+
+        grandTotal += remain;
+
         html += `
     <tr>
       <td>${bank?.name || ''}</td>
       <td>Tín dụng</td>
       <td>${formatMoney(credit.limit)}</td>
       <td>${formatMoney(-used)}</td>
-      <td>${formatMoney(credit.limit + used)}</td>
+      <td>${formatMoney(remain)}</td>
     </tr>`;
       }
     }
 
   });
-
+  html += `
+  <tr style="font-weight:bold; background:#e8f5e9">
+    <td colspan="4">Tổng cộng</td>
+    <td>${formatMoney(grandTotal)}</td>
+  </tr>
+  `;
   document.getElementById("balanceTable").innerHTML = html;
 }
 
 // ===== TABLE =====
-function renderTables(data){
+function renderTables(data) {
 
   const incomeData = data.filter(d => d.type === "income");
   const expenseData = data.filter(d => d.type === "expense");
@@ -395,23 +449,40 @@ function renderTables(data){
   renderTableWithPaging(expenseData, "expenseTable", "expense", currentPageExpense);
 }
 
-function renderTableWithPaging(data, tableId, type, currentPage){
+function formatDate(ts) {
+  if (!ts) return '';
+  const date = ts.seconds
+    ? new Date(ts.seconds * 1000)
+    : ts.toDate();
+
+  return date.toLocaleString('vi-VN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit'
+  });
+}
+
+function renderTableWithPaging(data, tableId, type, currentPage) {
 
   const start = (currentPage - 1) * pageSize;
   const end = start + pageSize;
   const pageData = data.slice(start, end);
 
   let html = `<tr>
-    <th>ID</th><th>Bank</th><th>Source</th><th>Tiền</th><th>Note</th>
+    <th>ID</th><th>Bank</th><th>Source</th><th>Amount</th><th>Time</th><th>Note</th>
   </tr>`;
 
   pageData.forEach(d => {
     html += `
     <tr>
       <td>${d.id}</td>
-      <td>${BANKS[d.bankId]?.short || ''}</td>
+      <td>${BANKS[d.bankId]?.name || ''}</td>
       <td>${SOURCES[d.sourceId]?.short || ''}</td>
       <td>${formatMoney(d.amount)}</td>
+      <td>${formatDate(d.createdAt)}</td>
       <td>${d.note || ''}</td>
     </tr>`;
   });
@@ -422,10 +493,10 @@ function renderTableWithPaging(data, tableId, type, currentPage){
 
   let pagingHTML = `<tr><td colspan="5">`;
 
-  for(let i = 1; i <= totalPages; i++){
+  for (let i = 1; i <= totalPages; i++) {
     pagingHTML += `
       <button onclick="changePage('${type}', ${i})"
-        style="margin:2px; ${i===currentPage?'font-weight:bold':''}">
+        style="margin:2px; ${i === currentPage ? 'font-weight:bold' : ''}">
         ${i}
       </button>
     `;
@@ -436,10 +507,10 @@ function renderTableWithPaging(data, tableId, type, currentPage){
   document.getElementById(tableId).innerHTML = html + pagingHTML;
 }
 
-function changePage(type, page){
-  if(type === "income"){
+function changePage(type, page) {
+  if (type === "income") {
     currentPageIncome = page;
-  }else{
+  } else {
     currentPageExpense = page;
   }
 
@@ -447,7 +518,7 @@ function changePage(type, page){
 }
 
 // ===== FILTER TRIGGER =====
-function loadData(){
+function loadData() {
   currentPageIncome = 1;
   currentPageExpense = 1;
   renderAll();

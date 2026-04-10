@@ -169,7 +169,7 @@ async function loadUsers(){
   const snap = await db.collection("users").get();
 
   let html = `<tr>
-    <th>User name</th><th>Email</th><th>Tên</th><th>Role</th>
+    <th>ID</th><th>Email</th><th>Tên</th><th>Role</th>
     <th>Trạng thái</th><th>Lý do</th><th>Action</th>
   </tr>`;
 
@@ -178,7 +178,7 @@ async function loadUsers(){
     if(d.isDeleted) return;
 
     html += `<tr>
-      <td>${d.username || d.id}</td>
+      <td>${d.id || d.username}</td>
       <td>${d.email}</td>
       <td>${d.name || ''}</td>
       <td>${renderUserRole(d.role)}</td>
@@ -316,7 +316,17 @@ async function saveBank(){
 }
 
 async function loadBanks(){
-  const snap=await db.collection("banks").get();
+
+  const statusFilter = document.getElementById("filterStatus").value;
+
+  let query = db.collection("banks");
+
+  // 👉 ÁP DỤNG FILTER
+  if(statusFilter !== "all"){
+    query = query.where("status", "==", statusFilter === "true");
+  }
+
+  const snap = await query.get();
 
   let html=`<tr>
   <th>ID</th><th>Tên</th><th>Short</th><th>Loại TK</th><th>Màu</th><th>Trạng thái</th><th>Lý do</th><th>Action</th></tr>`;
@@ -328,9 +338,9 @@ async function loadBanks(){
     html+=`<tr>
       <td>${d.id}</td>
       <td>${d.name}</td>
-<td>${d.short||''}</td>
-<td>${renderBankType(d.type)}</td>
-<td><div style="width:20px;height:20px;background:${d.color};margin:auto"></div></td>
+      <td>${d.short||''}</td>
+      <td>${renderBankType(d.type)}</td>
+      <td><div style="width:20px;height:20px;background:${d.color};margin:auto"></div></td>
       <td>${d.status?'Hoạt động':'Ngưng'}</td>
       <td>${d.reason||''}</td>
       <td>
