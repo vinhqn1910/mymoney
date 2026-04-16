@@ -92,8 +92,8 @@ function openPopup(type){
   if(type==="source"){
     c.innerHTML=`
       <h3>Nguồn tiền</h3>
-      <input id="sourceName" placeholder="Viết tắt">
-      <input id="sourceShort" placeholder="Tên Ngân hàng">
+      <input id="sourceName" placeholder="Tên">
+      <input id="sourceShort" placeholder="Viết tắt">
       <label>Màu:</label>
       <input type="color" id="sourceColor">
 
@@ -132,6 +132,127 @@ function openPopup(type){
         <button class="btn-close" onclick="closePopup()">Đóng</button>
       </div>
     `;
+  }
+  if(type==="editPermission"){
+    c.innerHTML=`
+      <h3>Quyền edit thu - chi</h3>
+  
+      <div class="setting-row">
+        <span>Enable edit</span>
+        <label class="switch">
+          <input type="checkbox" id="enableEdit" onchange="toggleEditPermission()">
+          <span class="slider"></span>
+        </label>
+      </div>
+  
+      <div id="editOptions" style="opacity:0.5;pointer-events:none;">
+  
+        <div class="setting-row">
+          <span>Quyền thu</span>
+          <label class="switch">
+            <input type="checkbox" id="allowIncome">
+            <span class="slider"></span>
+          </label>
+        </div>
+  
+        <div class="setting-row">
+          <span>Quyền chi</span>
+          <label class="switch">
+            <input type="checkbox" id="allowExpense">
+            <span class="slider"></span>
+          </label>
+        </div>
+  
+        <div class="setting-row">
+          <span>Time edit (giờ)</span>
+          <input id="editTime" type="number" step="0.5" value="1.5" style="width:80px;">
+        </div>
+  
+      </div>
+  
+      <div class="btn-group-center">
+        <button class="btn-save" onclick="saveEditPermission()">Lưu</button>
+        <button class="btn-close" onclick="closePopup()">Đóng</button>
+      </div>
+    `;
+  
+    setTimeout(loadEditPermission,100);
+  }
+}
+
+function toggleEditPermission(isInit=false){
+  const enable = document.getElementById("enableEdit").checked;
+  const box = document.getElementById("editOptions");
+
+  if(enable){
+    box.style.opacity = "1";
+    box.style.pointerEvents = "auto";
+  }else{
+    box.style.opacity = "0.5";
+    box.style.pointerEvents = "none";
+
+    // ❗ chỉ reset khi user click, KHÔNG reset khi load
+    if(!isInit){
+      document.getElementById("allowIncome").checked = false;
+      document.getElementById("allowExpense").checked = false;
+      document.getElementById("editTime").value = 1.5;
+    }
+  }
+}
+
+async function saveEditPermission(){
+  if(!startLoading()) return;
+
+  try{
+    const enable = document.getElementById("enableEdit").checked;
+
+    await db.collection("settings").doc("editPermission").set({
+      enable,
+      allowIncome: enable ? document.getElementById("allowIncome").checked : false,
+      allowExpense: enable ? document.getElementById("allowExpense").checked : false,
+      editTime: enable ? Number(document.getElementById("editTime").value) : 1.5,
+      updatedAt: now(),
+      updatedBy: getUser()
+    });
+
+    showToast("Đã lưu quyền edit");
+    closePopup();
+
+  }catch(e){
+    showToast(e.message,"error");
+  }
+
+  endLoading();
+}
+
+async function loadEditPermission(){
+  try{
+    const doc = await db.collection("settings").doc("editPermission").get();
+
+    // Nếu chưa có config → set default
+    if(!doc.exists){
+      document.getElementById("enableEdit").checked = false;
+      document.getElementById("allowIncome").checked = false;
+      document.getElementById("allowExpense").checked = false;
+      document.getElementById("editTime").value = 1.5;
+
+      toggleEditPermission();
+      return;
+    }
+
+    const d = doc.data();
+
+    // 👉 set dữ liệu từ DB
+    document.getElementById("enableEdit").checked = d.enable || false;
+    document.getElementById("allowIncome").checked = d.allowIncome || false;
+    document.getElementById("allowExpense").checked = d.allowExpense || false;
+    document.getElementById("editTime").value = d.editTime || 1.5;
+
+    // 👉 QUAN TRỌNG: apply UI
+    toggleEditPermission(true);
+
+  }catch(e){
+    console.error("Load editPermission lỗi:", e);
   }
 }
 

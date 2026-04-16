@@ -10,6 +10,7 @@ let isSaving = false;
 let currentPageIncome = 1;
 let currentPageExpense = 1;
 const pageSize = 10;
+let EDIT_PERMISSION = null;
 
 // ===== UTIL =====
 function now() { return new Date(); }
@@ -59,11 +60,22 @@ function openCashPopup(type) {
   c.innerHTML = `
   <h3>${type === "income" ? "Thu tiền" : "Chi tiền"}</h3>
 
-<label class="checkbox-inline">
+<label class="switch">
   <input type="checkbox" id="autoBankType"
     onchange="handleAutoBank('${type}')">
-  <span>Dùng ${type === "income" ? "TK chuyên thu" : "TK chuyên trả"}</span>
+  <span class="slider"></span>
+  <span class="switch-label">
+    Dùng ${type === "income" ? "TK chuyên thu" : "TK chuyên trả"}
+  </span>
 </label>
+
+  ${type === "expense" ? `
+<label class="switch">
+  <input type="checkbox" id="isWithdraw">
+  <span class="slider"></span>
+  <span class="switch-label">Rút tiền</span>
+</label>
+  ` : ''}
 
   <div id="bankSuggestBox" style="display:none;margin:10px 0;"></div>
 
@@ -85,6 +97,26 @@ function openCashPopup(type) {
 `;
 
   loadOptions();
+
+  // ✅ HANDLE SWITCH RÚT TIỀN
+  if (type === "expense") {
+    setTimeout(() => {
+      const sw = document.getElementById("isWithdraw");
+      const noteInput = document.getElementById("cashNote");
+
+      if (sw) {
+        sw.addEventListener("change", (e) => {
+          if (e.target.checked) {
+            noteInput.value = "Rút tiền mặt";
+            noteInput.disabled = true;
+          } else {
+            noteInput.value = "";
+            noteInput.disabled = false;
+          }
+        });
+      }
+    }, 0);
+  }
 }
 
 function handleAutoBank(type) {
@@ -174,6 +206,143 @@ function loadOptions() {
   document.getElementById("cashBank").innerHTML = bankHTML;
   document.getElementById("cashSource").innerHTML = sourceHTML;
 }
+//load chỉnh sửa thu chi
+async function loadEditPermission() {
+  const doc = await db.collection("settings").doc("editPermission").get();
+  if (doc.exists) {
+    EDIT_PERMISSION = doc.data();
+  }
+}
+// nút chỉnh sửa thu chi
+function canEditCash(item) {
+
+  if (!EDIT_PERMISSION || !EDIT_PERMISSION.enable) return false;
+
+  const nowTime = new Date();
+
+  const createdAt = item.createdAt?.seconds
+    ? new Date(item.createdAt.seconds * 1000)
+    : item.createdAt?.toDate?.();
+
+  if (!createdAt) return false;
+
+  const diffMs = nowTime - createdAt;
+  const diffMinutes = diffMs / (1000 * 60);
+
+  const allowMinutes = EDIT_PERMISSION.editTime * 60;
+
+  if (diffMinutes > allowMinutes) return false;
+
+  if (item.type === "income" && !EDIT_PERMISSION.allowIncome) return false;
+  if (item.type === "expense" && !EDIT_PERMISSION.allowExpense) return false;
+
+  return true;
+}
+
+function getEditTimeLeft(item) {
+
+  if (!EDIT_PERMISSION?.enable) return "";
+
+  const createdAt = item.createdAt?.seconds
+    ? new Date(item.createdAt.seconds * 1000)
+    : item.createdAt?.toDate?.();
+
+  if (!createdAt) return "";
+
+  const nowTime = new Date();
+  const diffMs = nowTime - createdAt;
+
+  const maxMs = EDIT_PERMISSION.editTime * 60 * 60 * 1000;
+  const remain = maxMs - diffMs;
+
+  if (remain <= 0) return "Hết hạn";
+
+  const minutes = Math.floor(remain / (1000 * 60));
+  return `${minutes}p`;
+}
+
+function editCash(id) {
+
+  const item = CASH.find(x => x.id === id);
+  if (!item) return showToast("Không tìm thấy dữ liệu");
+
+  if (!canEditCash(item)) {
+    return showToast("Đã hết thời gian chỉnh sửa!");
+  }
+  // mở popup giống create
+  openCashPopup(item.type);
+
+  setTimeout(() => {
+
+    document.getElementById("cashBank").value = item.bankId;
+    document.getElementById("cashSource").value = item.sourceId;
+    document.getElementById("cashAmount").value =
+      formatMoney(item.amount);
+
+    document.getElementById("cashNote").value = item.note || "";
+
+    // đổi nút save thành update
+    const btn = document.getElementById("saveBtn");
+    btn.innerText = "Cập nhật";
+    btn.onclick = () => updateCash(id, item.type);
+
+  }, 100);
+}
+
+async function updateCash(id, type) {
+
+  if (isSaving) return;
+
+  const btn = document.getElementById("saveBtn");
+
+  const amount = getRawMoney("cashAmount");
+  if (!amount) return showToast("Nhập tiền");
+
+  const bankId = document.getElementById("cashBank").value;
+  const sourceId = document.getElementById("cashSource").value;
+  const note = document.getElementById("cashNote").value;
+
+  const bank = BANKS[bankId];
+  const source = SOURCES[sourceId]?.short;
+
+  if (!bank || bank.status === false) {
+    return showToast("Ngân hàng đang ngưng hoạt động!");
+  }
+
+  if (source === "TD") {
+    const limit = LIMITS[bankId];
+    if (!limit || limit.status === false) {
+      return showToast("Hạn mức tín dụng đang ngưng!");
+    }
+  }
+
+  try {
+    isSaving = true;
+
+    btn.innerHTML = `<span class="loading-spinner"></span>Đang cập nhật`;
+    btn.disabled = true;
+
+    await db.collection("cashflow").doc(id).update({
+      bankId,
+      sourceId,
+      amount: Number(amount),
+      note,
+      updatedAt: now(),
+      updatedBy: getUser()
+    });
+
+    showToast("Đã cập nhật");
+    closePopup();
+
+  } catch (err) {
+    console.error(err);
+    showToast("Lỗi khi cập nhật!");
+  } finally {
+    isSaving = false;
+    btn.innerHTML = "Cập nhật";
+    btn.disabled = false;
+  }
+}
 
 // ===== SAVE =====
 async function saveCash(type) {
@@ -185,23 +354,21 @@ async function saveCash(type) {
   const amount = getRawMoney("cashAmount");
   if (!amount) return showToast("Nhập tiền");
 
-  // ===== LẤY DATA =====
   const bankId = document.getElementById("cashBank").value;
   const sourceId = document.getElementById("cashSource").value;
   const note = document.getElementById("cashNote").value;
 
+  const isWithdraw = type === "expense" && document.getElementById("isWithdraw")?.checked;
+
   const bank = BANKS[bankId];
   const source = SOURCES[sourceId]?.short;
 
-  // ===== CHECK BANK =====
   if (!bank || bank.status === false) {
     return showToast("Ngân hàng đang ngưng hoạt động!");
   }
 
-  // ===== CHECK LIMIT (CHỈ TÍN DỤNG) =====
   if (source === "TD") {
     const limit = LIMITS[bankId];
-
     if (!limit || limit.status === false) {
       return showToast("Hạn mức tín dụng đang ngưng!");
     }
@@ -213,32 +380,65 @@ async function saveCash(type) {
     btn.innerHTML = `<span class="loading-spinner"></span>Đang lưu`;
     btn.disabled = true;
 
-    // ===== OPTIMISTIC UI =====
+    // ✅ NOTE FINAL
+    let finalNote = note;
+    if (isWithdraw) {
+      finalNote = "Rút tiền mặt";
+    }
+
+    // ✅ OPTIMISTIC UI
     const tempData = {
       id: "temp-" + Date.now(),
       type,
       bankId,
       sourceId,
       amount: Number(amount),
-      note
+      note: finalNote
     };
 
     CASH.unshift(tempData);
     renderAll();
 
-    // ===== GENERATE ID =====
-    const id = await getNextId(
-      type === "income" ? "income" : "expense",
-      type === "income" ? "TT" : "CT"
-    );
+    // ===== ID CHI =====
+    const expenseId = await getNextId("expense", "CT");
 
-    // ===== SAVE FIRESTORE =====
-    await db.collection("cashflow").doc(id).set({
+    // ===== SAVE CHI =====
+    await db.collection("cashflow").doc(expenseId).set({
       ...tempData,
-      id,
+      id: expenseId,
+      note: finalNote,
       createdAt: now(),
       createdBy: getUser()
     });
+
+    // ===== NẾU RÚT TIỀN → TẠO THU =====
+    if (isWithdraw) {
+
+      const incomeId = await getNextId("income", "TT");
+
+      // tìm bank tiền mặt
+      const cashBankId = Object.keys(BANKS).find(id => {
+        const t = BANKS[id].type;
+        return t && t.toLowerCase().trim() === "cash";
+      });
+
+      if (!cashBankId) {
+        showToast("Không tìm thấy tài khoản tiền mặt!");
+      } else {
+
+        await db.collection("cashflow").doc(incomeId).set({
+          id: incomeId,
+          type: "income",
+          bankId: cashBankId,
+          sourceId,
+          amount: Math.abs(Number(amount)),
+          note: `Giao dịch rút tiền từ ID ${expenseId}`,
+          createdAt: now(),
+          createdBy: getUser()
+        });
+
+      }
+    }
 
     showToast("Đã lưu");
     closePopup();
@@ -472,10 +672,13 @@ function renderTableWithPaging(data, tableId, type, currentPage) {
   const pageData = data.slice(start, end);
 
   let html = `<tr>
-    <th>ID</th><th>Bank</th><th>Source</th><th>Amount</th><th>Time</th><th>Note</th>
+    <th>ID</th><th>Bank</th><th>Source</th><th>Amount</th><th>Time</th><th>Note</th><th>Action</th>
   </tr>`;
 
   pageData.forEach(d => {
+
+    const canEdit = canEditCash(d);
+  
     html += `
     <tr>
       <td>${d.id}</td>
@@ -484,6 +687,12 @@ function renderTableWithPaging(data, tableId, type, currentPage) {
       <td>${formatMoney(d.amount)}</td>
       <td>${formatDate(d.createdAt)}</td>
       <td>${d.note || ''}</td>
+<td>
+  ${canEdit ? `<button onclick="editCash('${d.id}')">✏️</button>` : ''}
+  <div style="font-size:11px;color:#888">
+    ${getEditTimeLeft(d)}
+  </div>
+</td>
     </tr>`;
   });
 
@@ -529,7 +738,9 @@ async function initApp() {
   await Promise.all([
     loadBanks(),
     loadSources(),
-    loadLimits()
+    loadLimits(),
+    loadEditPermission()
+
   ]);
 
   listenCashflow();
