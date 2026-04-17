@@ -322,7 +322,7 @@ button{
 
 button:hover{
   opacity:0.85;
-  transform:scale(1.05);
+  transform:translateY(-1px);
 }
 
 /* ===== NÚT LƯU ===== */
@@ -393,10 +393,17 @@ button:active{
   .popup{
     align-items: flex-end; /* popup trượt từ dưới lên */
   }
+  .popup-content input,
+  .popup-content select,
+  .popup-content textarea{
+    font-size:16px !important;
+  }
 
   .popup-content{
     width:100%;
     max-width:100%;
+    height:90vh; /* 🔥 QUAN TRỌNG */
+    overflow-y:auto;
     border-radius:16px 16px 0 0;
     padding:16px;
     animation:slideUp 0.25s ease;
