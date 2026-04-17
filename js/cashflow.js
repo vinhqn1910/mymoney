@@ -85,8 +85,13 @@ function openCashPopup(type) {
   <label>Nguồn tiền</label>
   <select id="cashSource"></select>
 
-  <input id="cashAmount" placeholder="Số tiền"
-    oninput="formatMoneyInput(this, ${type === "expense"})">
+<input 
+  id="cashAmount" 
+  type="text"
+  inputmode="numeric"
+  pattern="[0-9]*"
+  placeholder="Số tiền"
+  oninput="formatMoneyInput(this, ${type === 'expense'})">
 
   <input id="cashNote" placeholder="Nội dung">
 
