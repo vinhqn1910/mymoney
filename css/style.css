@@ -366,7 +366,7 @@ button:active{
   html, body{
     overflow-x:hidden;
   }
-  
+
   .table{
     display:block;
     overflow-x:auto;
@@ -382,9 +382,9 @@ button:active{
   }
 
   .popup-content{
-    width:105vw;
-    max-width:105vw;
-    height:60dvh;
+    width:100vw;
+    max-width:100vw;
+    height:80dvh;
     max-height:100dvh;
 
     overflow-y:auto;
