@@ -175,7 +175,12 @@ auth.onAuthStateChanged(async user=>{
 
   if(user){
     await initCounter();
+    sessionStorage.removeItem("timeoutShown");
 
+    if(!sessionStorage.getItem("loginAt")){
+      sessionStorage.setItem("loginAt", Date.now());
+    }
+    await checkLoginTimeout();
     const email = user.email.toLowerCase();
     const userRef = db.collection("users").doc(email);
     const doc = await userRef.get();
@@ -214,3 +219,43 @@ auth.onAuthStateChanged(async user=>{
     window.location.href = "index.html";
   }
 });
+
+async function checkLoginTimeout(){
+  try{
+    const doc = await db.collection("settings").doc("loginTime").get();
+
+    let maxHours = 36; // default
+
+    if(doc.exists){
+      const d = doc.data();
+      if(d.enable){
+        maxHours = d.hours || 36;
+      }
+    }
+
+    const loginAt = Number(sessionStorage.getItem("loginAt"));
+    if(!loginAt) return;
+
+    const nowTime = Date.now();
+    const diffHours = (nowTime - loginAt) / (1000 * 60 * 60);
+
+    if(diffHours > maxHours){
+
+      if(sessionStorage.getItem("timeoutShown")) return;
+    
+      sessionStorage.setItem("timeoutShown", "1");
+      sessionStorage.removeItem("loginAt");
+    
+      alert(`Đã hết thời gian đăng nhập (${maxHours} giờ).\nVui lòng đăng nhập lại!`);
+    
+      logout();
+    }
+
+  }catch(e){
+    console.error("Timeout error:", e);
+  }
+}
+
+
+setInterval(checkLoginTimeout, 60000); // mỗi 60s
+

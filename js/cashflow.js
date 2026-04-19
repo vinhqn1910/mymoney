@@ -69,11 +69,27 @@ function openCashPopup(type) {
   </span>
 </label>
 
-  ${type === "expense" ? `
+${type === "expense" ? `
+
 <label class="switch">
-  <input type="checkbox" id="isWithdraw">
+  <input type="checkbox" id="isWithdraw"
+    onchange="handleWithdrawToggle()">
   <span class="slider"></span>
   <span class="switch-label">Rút tiền</span>
+</label>
+
+<label class="switch">
+  <input type="checkbox" id="isInternal"
+    onchange="handleInternalToggle()">
+  <span class="slider"></span>
+  <span class="switch-label">Hạch toán nội bộ</span>
+</label>
+
+<label class="switch">
+  <input type="checkbox" id="isCreditPayment"
+    onchange="handleCreditPaymentToggle()">
+  <span class="slider"></span>
+  <span class="switch-label">Thanh toán tín dụng</span>
 </label>
   ` : ''}
 
@@ -84,6 +100,12 @@ function openCashPopup(type) {
 
   <label>Nguồn tiền</label>
   <select id="cashSource"></select>
+
+  <!-- 👇 đặt xuống đây -->
+<div id="internalBankBox" style="display:none;">
+  <label>Ngân hàng nhận</label>
+  <select id="cashBankTo" onchange="updateInternalNote()"></select>
+</div>
 
 <input 
   id="cashAmount" 
@@ -103,25 +125,147 @@ function openCashPopup(type) {
 
   loadOptions();
 
-  // ✅ HANDLE SWITCH RÚT TIỀN
-  if (type === "expense") {
-    setTimeout(() => {
-      const sw = document.getElementById("isWithdraw");
-      const noteInput = document.getElementById("cashNote");
+}
 
-      if (sw) {
-        sw.addEventListener("change", (e) => {
-          if (e.target.checked) {
-            noteInput.value = "Rút tiền mặt";
-            noteInput.disabled = true;
-          } else {
-            noteInput.value = "";
-            noteInput.disabled = false;
-          }
-        });
-      }
-    }, 0);
+function handleCreditPaymentToggle() {
+  const credit = document.getElementById("isCreditPayment");
+  const withdraw = document.getElementById("isWithdraw");
+  const internal = document.getElementById("isInternal");
+
+  const noteInput = document.getElementById("cashNote");
+  const internalBox = document.getElementById("internalBankBox");
+  const bankTo = document.getElementById("cashBankTo");
+
+  if (credit.checked) {
+
+    withdraw.checked = false;
+    internal.checked = false;
+  
+    if (internalBox) internalBox.style.display = "block";
+  
+    // ✅ LOAD ONLY CREDIT BANK
+    loadBankToOptions("credit");
+  
+    const bankName = BANKS[bankTo?.value]?.name || "";
+  
+    noteInput.value = `Chi tiền TTTD ${bankName}`;
+    noteInput.disabled = true;
+  
+  } else {
+    if (internalBox) internalBox.style.display = "none";
+
+    noteInput.value = "";
+    noteInput.disabled = false;
   }
+}
+
+function loadBankToOptions(mode) {
+  const bankToEl = document.getElementById("cashBankTo");
+  if (!bankToEl) return;
+
+  let html = "";
+
+  Object.keys(BANKS).forEach(id => {
+    const bank = BANKS[id];
+    const limit = LIMITS[id];
+
+    if (bank.isDeleted || bank.status === false) return;
+
+    // ✅ HẠCH TOÁN NỘI BỘ → ALL BANK ACTIVE
+    if (mode === "internal") {
+      html += `<option value="${id}">${bank.name}</option>`;
+    }
+
+    // ✅ THANH TOÁN TÍN DỤNG → ONLY BANK CÓ LIMIT
+    if (mode === "credit") {
+      if (limit && limit.status !== false) {
+        html += `<option value="${id}">${bank.name}</option>`;
+      }
+    }
+  });
+
+  bankToEl.innerHTML = html;
+}
+
+function updateInternalNote() {
+  const internal = document.getElementById("isInternal");
+  const credit = document.getElementById("isCreditPayment");
+
+  const bankTo = document.getElementById("cashBankTo");
+  const noteInput = document.getElementById("cashNote");
+
+  const bankName = BANKS[bankTo.value]?.name || "";
+
+  if (internal?.checked) {
+    noteInput.value = `Hạch toán nội bộ đến NH ${bankName}`;
+  }
+
+  if (credit?.checked) {
+    noteInput.value = `Chi tiền TTTD ${bankName}`;
+  }
+}
+
+function handleInternalToggle() {
+  const internal = document.getElementById("isInternal");
+  const withdraw = document.getElementById("isWithdraw");
+  const credit = document.getElementById("isCreditPayment");
+
+  const noteInput = document.getElementById("cashNote");
+  const internalBox = document.getElementById("internalBankBox");
+  const bankTo = document.getElementById("cashBankTo");
+
+  if (internal.checked) {
+
+    withdraw.checked = false;
+    credit.checked = false;
+  
+    if (internalBox) internalBox.style.display = "block";
+  
+    // ✅ LOAD ALL BANK
+    loadBankToOptions("internal");
+  
+    const bankName = BANKS[bankTo?.value]?.name || "";
+  
+    noteInput.value = `Hạch toán nội bộ đến NH ${bankName}`;
+    noteInput.disabled = true;
+  
+  } else {
+    if (internalBox) internalBox.style.display = "none";
+
+    noteInput.value = "";
+    noteInput.disabled = false;
+  }
+}
+
+function handleWithdrawToggle() {
+  const withdraw = document.getElementById("isWithdraw");
+  const internal = document.getElementById("isInternal");
+  const credit = document.getElementById("isCreditPayment");
+
+  const noteInput = document.getElementById("cashNote");
+  const internalBox = document.getElementById("internalBankBox");
+
+  if (withdraw.checked) {
+
+    // ✅ tắt các mode khác
+    internal.checked = false;
+    credit.checked = false;
+
+    if (internalBox) internalBox.style.display = "none";
+
+    noteInput.value = "Rút tiền mặt";
+    noteInput.disabled = true;
+
+  } else {
+    noteInput.value = "";
+    noteInput.disabled = false;
+  }
+}
+function toggleInternalTransfer() {
+  const checked = document.getElementById("isInternal").checked;
+  const box = document.getElementById("internalBankBox");
+
+  box.style.display = checked ? "block" : "none";
 }
 
 function handleAutoBank(type) {
@@ -210,6 +354,21 @@ function loadOptions() {
 
   document.getElementById("cashBank").innerHTML = bankHTML;
   document.getElementById("cashSource").innerHTML = sourceHTML;
+  const bankToEl = document.getElementById("cashBankTo");
+if (bankToEl) {
+  let bankToHTML = "";
+
+  Object.keys(BANKS).forEach(id => {
+    const bank = BANKS[id];
+    const limit = LIMITS[id];
+  
+    {
+      bankToHTML += `<option value="${id}">${bank.name}</option>`;
+    }
+  });
+  
+  bankToEl.innerHTML = bankToHTML;
+}
 }
 //load chỉnh sửa thu chi
 async function loadEditPermission() {
@@ -351,7 +510,9 @@ async function updateCash(id, type) {
 
 // ===== SAVE =====
 async function saveCash(type) {
-
+  const isInternal = type === "expense" && document.getElementById("isInternal")?.checked;
+  const bankToId = document.getElementById("cashBankTo")?.value;
+  const isCredit = type === "expense" && document.getElementById("isCreditPayment")?.checked;
   if (isSaving) return;
 
   const btn = document.getElementById("saveBtn");
@@ -387,8 +548,19 @@ async function saveCash(type) {
 
     // ✅ NOTE FINAL
     let finalNote = note;
+
     if (isWithdraw) {
       finalNote = "Rút tiền mặt";
+    }
+    
+    if (isInternal) {
+      const bankToName = BANKS[bankToId]?.name || "";
+      finalNote = `Hạch toán nội bộ đến NH ${bankToName}`;
+    }
+
+    if (isCredit) {
+      const bankToName = BANKS[bankToId]?.name || "";
+      finalNote = `Chi tiền TTTD ${bankToName}`;
     }
 
     // ✅ OPTIMISTIC UI
@@ -417,33 +589,86 @@ async function saveCash(type) {
     });
 
     // ===== NẾU RÚT TIỀN → TẠO THU =====
-    if (isWithdraw) {
+// ===== RÚT TIỀN =====
+if (isWithdraw) {
 
-      const incomeId = await getNextId("income", "TT");
+  const incomeId = await getNextId("income", "TT");
 
-      // tìm bank tiền mặt
-      const cashBankId = Object.keys(BANKS).find(id => {
-        const t = BANKS[id].type;
-        return t && t.toLowerCase().trim() === "cash";
-      });
+  const cashBankId = Object.keys(BANKS).find(id => {
+    const t = BANKS[id].type;
+    return t && t.toLowerCase().trim() === "cash";
+  });
 
-      if (!cashBankId) {
-        showToast("Không tìm thấy tài khoản tiền mặt!");
-      } else {
+  if (!cashBankId) {
+    showToast("Không tìm thấy tài khoản tiền mặt!");
+  } else {
+    await db.collection("cashflow").doc(incomeId).set({
+      id: incomeId,
+      type: "income",
+      bankId: cashBankId,
+      sourceId,
+      amount: Math.abs(Number(amount)),
+      note: `Giao dịch rút tiền từ ID ${expenseId}`,
+      createdAt: now(),
+      createdBy: getUser()
+    });
+  }
+}
 
-        await db.collection("cashflow").doc(incomeId).set({
-          id: incomeId,
-          type: "income",
-          bankId: cashBankId,
-          sourceId,
-          amount: Math.abs(Number(amount)),
-          note: `Giao dịch rút tiền từ ID ${expenseId}`,
-          createdAt: now(),
-          createdBy: getUser()
-        });
+// ===== HẠCH TOÁN NỘI BỘ =====
+if (isInternal) {
 
-      }
-    }
+  if (!bankToId) {
+    showToast("Chưa chọn ngân hàng nhận!");
+  } else {
+
+    const incomeId = await getNextId("income", "TT");
+
+    await db.collection("cashflow").doc(incomeId).set({
+      id: incomeId,
+      type: "income",
+      bankId: bankToId,
+      sourceId,
+      amount: Math.abs(Number(amount)),
+      note: `Nhận tiền từ ID ${expenseId}`,
+      createdAt: now(),
+      createdBy: getUser()
+    });
+
+  }
+}
+
+
+// ===== THANH TOÁN TÍN DỤNG =====
+if (isCredit) {
+
+  if (!bankToId) {
+    showToast("Chưa chọn ngân hàng nhận!");
+  } else {
+
+    const incomeId = await getNextId("income", "TT");
+
+    const bankToName = BANKS[bankToId]?.name || "";
+
+    await db.collection("cashflow").doc(incomeId).set({
+      id: incomeId,
+      type: "income",
+
+      // 🔥 QUAN TRỌNG: tiền về là tín dụng
+      bankId: bankToId,
+      sourceId: Object.keys(SOURCES).find(id => SOURCES[id].short === "TD"),
+
+      amount: Math.abs(Number(amount)),
+
+      note: `TTTD ${bankToName} bởi ID ${expenseId}`,
+
+      createdAt: now(),
+      createdBy: getUser()
+    });
+
+  }
+}
+
 
     showToast("Đã lưu");
     closePopup();

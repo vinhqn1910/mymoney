@@ -178,6 +178,96 @@ function openPopup(type){
   
     setTimeout(loadEditPermission,100);
   }
+  if(type==="loginTime"){
+    c.innerHTML=`
+      <h3>Set time login</h3>
+  
+      <div class="setting-row">
+        <span>Bật giới hạn thời gian</span>
+        <label class="switch">
+          <input type="checkbox" id="enableLoginTime" onchange="toggleLoginTime()">
+          <span class="slider"></span>
+        </label>
+      </div>
+  
+      <div id="loginTimeBox" style="opacity:0.5;pointer-events:none;">
+        <div class="setting-row">
+          <span>Thời gian (giờ)</span>
+          <input id="loginTimeValue" type="number" step="1" value="36" style="width:80px;">
+        </div>
+      </div>
+  
+      <div class="btn-group-center">
+        <button class="btn-save" onclick="saveLoginTime()">Lưu</button>
+        <button class="btn-close" onclick="closePopup()">Đóng</button>
+      </div>
+    `;
+  
+    setTimeout(loadLoginTime,100);
+  }
+}
+
+function toggleLoginTime(isInit=false){
+  const enable = document.getElementById("enableLoginTime").checked;
+  const box = document.getElementById("loginTimeBox");
+
+  if(enable){
+    box.style.opacity = "1";
+    box.style.pointerEvents = "auto";
+  }else{
+    box.style.opacity = "0.5";
+    box.style.pointerEvents = "none";
+
+    if(!isInit){
+      document.getElementById("loginTimeValue").value = 36;
+    }
+  }
+}
+
+async function saveLoginTime(){
+  if(!startLoading()) return;
+
+  try{
+    const enable = document.getElementById("enableLoginTime").checked;
+
+    await db.collection("settings").doc("loginTime").set({
+      enable,
+      hours: enable ? Number(document.getElementById("loginTimeValue").value) : 36,
+      updatedAt: now(),
+      updatedBy: getUser()
+    });
+
+    showToast("Đã lưu thời gian login");
+    closePopup();
+
+  }catch(e){
+    showToast(e.message,"error");
+  }
+
+  endLoading();
+}
+async function loadLoginTime(){
+  try{
+    const doc = await db.collection("settings").doc("loginTime").get();
+
+    if(!doc.exists){
+      document.getElementById("enableLoginTime").checked = false;
+      document.getElementById("loginTimeValue").value = 36;
+
+      toggleLoginTime();
+      return;
+    }
+
+    const d = doc.data();
+
+    document.getElementById("enableLoginTime").checked = d.enable || false;
+    document.getElementById("loginTimeValue").value = d.hours || 36;
+
+    toggleLoginTime(true);
+
+  }catch(e){
+    console.error("Load loginTime lỗi:", e);
+  }
 }
 
 function toggleEditPermission(isInit=false){
