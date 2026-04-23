@@ -107,6 +107,10 @@ ${type === "expense" ? `
   <select id="cashBankTo" onchange="updateInternalNote()"></select>
 </div>
 
+<div id="planBox" >
+  <label>Chọn kế hoạch</label>
+  <select id="planSelect"></select>
+</div>
 <input 
   id="cashAmount" 
   type="text"
@@ -124,7 +128,66 @@ ${type === "expense" ? `
 `;
 
   loadOptions();
+  renderPlanOptions(); 
 
+}
+
+let PLANS = {};
+
+async function loadPlans() {
+  const snap = await db.collection("plans").get();
+
+  PLANS = {};
+
+  snap.forEach(doc => {
+    const d = doc.data();
+
+    if (
+      !d.isDeleted &&
+      d.type === "once" &&
+      d.status === true
+    ) {
+      PLANS[d.id] = d;
+    }
+  });
+}
+
+function togglePlanSelect() {
+  const checked = document.getElementById("usePlan").checked;
+  const box = document.getElementById("planBox");
+
+  box.style.display = checked ? "block" : "none";
+
+  if (checked) {
+    renderPlanOptions();
+  }
+}
+
+function renderPlanOptions(selectedId = null) {
+  const el = document.getElementById("planSelect");
+  if (!el) return;
+
+  let html = `<option value="">-- Không áp dụng --</option>`;
+
+  Object.keys(PLANS).forEach(id => {
+    const p = PLANS[id];
+
+    const isUsed = Number(p.totalUsed) > 0;
+
+    // 🔥 FIX: luôn giữ plan đang edit
+    if (isUsed && id !== selectedId) return;
+
+    html += `<option value="${id}" ${id === selectedId ? "selected" : ""}>
+      ${p.title} (${formatMoney(p.totalUsed)})
+    </option>`;
+  });
+
+  el.innerHTML = html;
+
+  // 🔥 FORCE SELECT (phòng browser ignore selected)
+  if (selectedId) {
+    el.value = selectedId;
+  }
 }
 
 function handleCreditPaymentToggle() {
@@ -235,6 +298,16 @@ function handleInternalToggle() {
     noteInput.value = "";
     noteInput.disabled = false;
   }
+}
+
+async function setPlanUsed(planId, amount) {
+  const ref = db.collection("plans").doc(planId);
+
+  await ref.update({
+    totalUsed: amount,
+    updatedAt: now(),
+    updatedBy: getUser()
+  });
 }
 
 function handleWithdrawToggle() {
@@ -442,14 +515,16 @@ function editCash(id) {
     document.getElementById("cashSource").value = item.sourceId;
     document.getElementById("cashAmount").value =
       formatMoney(item.amount);
-
+  
     document.getElementById("cashNote").value = item.note || "";
-
-    // đổi nút save thành update
+  
+    // ✅ render lại plan có selected
+    renderPlanOptions(item.planId);
+  
     const btn = document.getElementById("saveBtn");
     btn.innerText = "Cập nhật";
     btn.onclick = () => updateCash(id, item.type);
-
+  
   }, 100);
 }
 
@@ -465,6 +540,8 @@ async function updateCash(id, type) {
   const bankId = document.getElementById("cashBank").value;
   const sourceId = document.getElementById("cashSource").value;
   const note = document.getElementById("cashNote").value;
+
+  const newPlanId = document.getElementById("planSelect")?.value || null;
 
   const bank = BANKS[bankId];
   const source = SOURCES[sourceId]?.short;
@@ -486,14 +563,47 @@ async function updateCash(id, type) {
     btn.innerHTML = `<span class="loading-spinner"></span>Đang cập nhật`;
     btn.disabled = true;
 
+    // ===== LẤY DATA CŨ =====
+    const oldItem = CASH.find(x => x.id === id);
+    const oldAmount = Number(oldItem?.amount || 0);
+    const oldPlanId = oldItem?.planId || null;
+
+    const newAmount = Number(amount);
+
+    // ===== UPDATE CASH =====
     await db.collection("cashflow").doc(id).update({
       bankId,
       sourceId,
-      amount: Number(amount),
+      amount: newAmount,
       note,
+      planId: newPlanId || null,
       updatedAt: now(),
       updatedBy: getUser()
     });
+
+    // ===== UPDATE PLAN =====
+
+    const newAmountAbs = Math.abs(newAmount);
+
+    // ===== UPDATE PLAN =====
+    if (oldPlanId && oldPlanId === newPlanId) {
+
+      // cùng plan → overwrite
+      await setPlanUsed(oldPlanId, newAmountAbs);
+    
+    } else {
+    
+      // reset plan cũ
+      if (oldPlanId) {
+        await setPlanUsed(oldPlanId, 0);
+      }
+    
+      // set plan mới
+      if (newPlanId) {
+        await setPlanUsed(newPlanId, newAmountAbs);
+      }
+    
+    }
 
     showToast("Đã cập nhật");
     closePopup();
@@ -513,6 +623,7 @@ async function saveCash(type) {
   const isInternal = type === "expense" && document.getElementById("isInternal")?.checked;
   const bankToId = document.getElementById("cashBankTo")?.value;
   const isCredit = type === "expense" && document.getElementById("isCreditPayment")?.checked;
+  const planId = document.getElementById("planSelect")?.value || null;
   if (isSaving) return;
 
   const btn = document.getElementById("saveBtn");
@@ -584,10 +695,13 @@ async function saveCash(type) {
       ...tempData,
       id: expenseId,
       note: finalNote,
+      planId: planId || null,
       createdAt: now(),
       createdBy: getUser()
     });
-
+    if (planId) {
+      await setPlanUsed(planId, Math.abs(Number(amount)));
+    }
     // ===== NẾU RÚT TIỀN → TẠO THU =====
 // ===== RÚT TIỀN =====
 if (isWithdraw) {
@@ -614,6 +728,7 @@ if (isWithdraw) {
     });
   }
 }
+
 
 // ===== HẠCH TOÁN NỘI BỘ =====
 if (isInternal) {
@@ -755,7 +870,13 @@ function listenCashflow() {
       CASH = [];
 
       snap.forEach(doc => {
-        CASH.push(doc.data());
+        const d = doc.data();
+      
+        CASH.push({
+          ...d,
+          id: d.id || doc.id,
+          planId: d.planId || null   // 🔥 FIX CHÍNH
+        });
       });
 
       renderAll();
@@ -969,7 +1090,8 @@ async function initApp() {
     loadBanks(),
     loadSources(),
     loadLimits(),
-    loadEditPermission()
+    loadEditPermission(),
+    loadPlans() 
 
   ]);
 
